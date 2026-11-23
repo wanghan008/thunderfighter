@@ -52,8 +52,17 @@ type Boss = {
   fireTimer: number;
 };
 
+type LeaderboardEntry = {
+  score: number;
+  stage: number;
+  date: string;
+};
+
 type Runtime = {
   elapsed: number;
+  stageElapsed: number;
+  stage: number;
+  scoreSubmitted: boolean;
   playerX: number;
   playerY: number;
   playerInvulnerable: number;
@@ -82,6 +91,9 @@ const PLAYER_RADIUS = 13;
 function createRuntime(): Runtime {
   return {
     elapsed: 0,
+    stageElapsed: 0,
+    stage: 1,
+    scoreSubmitted: false,
     playerX: WIDTH / 2,
     playerY: HEIGHT * 0.82,
     playerInvulnerable: 0,
@@ -117,6 +129,25 @@ function storeBestScore(score: number): void {
     window.localStorage.setItem("thunderfighter-best-score", String(score));
   } catch {
     // The current run remains playable when browser storage is unavailable.
+  }
+}
+
+function readLeaderboard(): LeaderboardEntry[] {
+  try {
+    const saved = JSON.parse(window.localStorage.getItem("thunderfighter-leaderboard") || "[]");
+    return Array.isArray(saved)
+      ? saved.filter((entry) => Number.isFinite(entry?.score) && Number.isFinite(entry?.stage)).slice(0, 10)
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+function storeLeaderboard(entries: LeaderboardEntry[]): void {
+  try {
+    window.localStorage.setItem("thunderfighter-leaderboard", JSON.stringify(entries));
+  } catch {
+    // Leaderboard persistence is optional; the game remains playable.
   }
 }
 
@@ -185,6 +216,7 @@ export function useShooterGame() {
   const [status, setStatus] = useState<GameStatus>("ready");
   const [score, setScore] = useState(0);
   const [bestScore, setBestScore] = useState(readBestScore);
+  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>(readLeaderboard);
   const [stage, setStage] = useState(1);
   const [lives, setLives] = useState(3);
   const [weaponLevel, setWeaponLevel] = useState(1);
@@ -211,6 +243,52 @@ export function useShooterGame() {
     statusRef.current = nextStatus;
     setStatus(nextStatus);
   }, []);
+
+  const recordLeaderboard = useCallback((newScore: number, reachedStage: number) => {
+    const entry: LeaderboardEntry = {
+      score: newScore,
+      stage: reachedStage,
+      date: new Date().toISOString(),
+    };
+    setLeaderboard((current) => {
+      const next = [...current, entry]
+        .sort((a, b) => b.score - a.score || b.stage - a.stage)
+        .slice(0, 10);
+      storeLeaderboard(next);
+      return next;
+    });
+  }, []);
+
+  const completeStage = useCallback(() => {
+    const game = runtimeRef.current;
+    if (statusRef.current !== "running" || game.boss === null) return;
+    const clearedStage = game.stage;
+    game.score += 1000 + 500 * clearedStage;
+    game.boss = null;
+    game.bossSpawned = false;
+    game.stageElapsed = 0;
+    game.stage += 1;
+    game.enemySpawnTimer = 1.2;
+    game.enemies = [];
+    game.enemyShots = [];
+    game.shots = [];
+    game.playerInvulnerable = Math.max(game.playerInvulnerable, 2.2);
+    setScore(game.score);
+    setBossHealth(0);
+    setBossMaxHealth(0);
+    if (game.stage > 10) {
+      game.score += 10000;
+      setScore(game.score);
+      if (!game.scoreSubmitted) {
+        game.scoreSubmitted = true;
+        recordLeaderboard(game.score, 10);
+      }
+      updateBestScore(game.score);
+      updateStatus("victory");
+      return;
+    }
+    setStage(game.stage);
+  }, [recordLeaderboard, updateBestScore, updateStatus]);
 
   const startGame = useCallback(() => {
     runtimeRef.current = createRuntime();
@@ -274,17 +352,12 @@ export function useShooterGame() {
       game.boss.hp -= 10;
       setBossHealth(Math.max(0, game.boss.hp));
       if (game.boss.hp <= 0) {
-        game.score += 3000;
-        game.boss = null;
-        setScore(game.score);
-        setBossHealth(0);
-        updateBestScore(game.score);
-        updateStatus("victory");
+        completeStage();
       }
     }
     setBombCount(game.bombCount);
     setScore(game.score);
-  }, [updateBestScore, updateStatus]);
+  }, [completeStage]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -336,44 +409,42 @@ export function useShooterGame() {
 
     const createEnemy = (elapsed: number) => {
       const game = runtimeRef.current;
-      const heavy = Math.random() < Math.min(0.14 + elapsed / 160, 0.38);
+      const difficulty = game.stage;
+      const heavy = Math.random() < Math.min(0.12 + difficulty * 0.035, 0.48);
       const radius = heavy ? 19 : 13;
+      const normalHp = difficulty >= 7 ? 2 : 1;
+      const hp = heavy ? 2 + Math.floor(difficulty / 4) : normalHp;
       game.enemies.push({
         x: radius + Math.random() * (WIDTH - radius * 2),
         y: -30,
         radius,
-        hp: heavy ? 3 : 1,
-        maxHp: heavy ? 3 : 1,
-        speed: (heavy ? 58 : 84) + Math.min(elapsed * 0.35, 28),
+        hp,
+        maxHp: hp,
+        speed: ((heavy ? 58 : 84) + Math.min(elapsed * 0.35, 28)) * (1 + difficulty * 0.075),
         phase: Math.random() * Math.PI * 2,
-        fireTimer: 2 + Math.random() * 1.6,
+        fireTimer: Math.max(0.8, 2.6 - difficulty * 0.14) + Math.random() * 0.9,
       });
     };
 
     const spawnBoss = () => {
       const game = runtimeRef.current;
+      const hp = 55 + game.stage * 30;
       game.boss = {
         x: WIDTH / 2,
         y: -100,
-        hp: 52,
-        maxHp: 52,
+        hp,
+        maxHp: hp,
         phase: 0,
-        fireTimer: 0.8,
+        fireTimer: Math.max(0.55, 1.45 - game.stage * 0.07),
       };
       game.bossSpawned = true;
-      setBossMaxHealth(52);
-      setBossHealth(52);
+      setBossMaxHealth(hp);
+      setBossHealth(hp);
     };
 
     const finishVictory = () => {
-      const game = runtimeRef.current;
       if (statusRef.current !== "running") return;
-      game.score += 3000;
-      game.boss = null;
-      setScore(game.score);
-      setBossHealth(0);
-      updateBestScore(game.score);
-      updateStatus("victory");
+      completeStage();
     };
 
     const damagePlayer = () => {
@@ -384,6 +455,10 @@ export function useShooterGame() {
       emitExplosion(game.playerX, game.playerY, "#75f3ff", 18);
       setLives(game.lives);
       if (game.lives <= 0) {
+        if (!game.scoreSubmitted) {
+          game.scoreSubmitted = true;
+          recordLeaderboard(game.score, game.stage);
+        }
         updateBestScore(game.score);
         updateStatus("gameover");
       }
@@ -429,6 +504,7 @@ export function useShooterGame() {
       if (statusRef.current !== "running") return;
 
       game.elapsed += dt;
+      game.stageElapsed += dt;
       game.playerInvulnerable = Math.max(0, game.playerInvulnerable - dt);
       game.bombFlash = Math.max(0, game.bombFlash - dt);
 
@@ -455,18 +531,15 @@ export function useShooterGame() {
       }
       game.spreadBuffTime = Math.max(0, game.spreadBuffTime - dt);
 
-      const nextStage = Math.floor(game.elapsed / 17) + 1;
-      if (nextStage !== Math.floor((game.elapsed - dt) / 17) + 1) {
-        setStage(nextStage);
-      }
-      if (game.elapsed >= 31 && !game.bossSpawned) {
+      if (game.stageElapsed >= 22 && !game.bossSpawned) {
         spawnBoss();
       }
 
       game.enemySpawnTimer -= dt;
-      if (!game.boss && game.enemySpawnTimer <= 0 && game.enemies.length < 4) {
-        createEnemy(game.elapsed);
-        game.enemySpawnTimer = Math.max(1.1, 1.75 - game.elapsed * 0.004);
+      const enemyLimit = Math.min(4 + Math.floor(game.stage / 2), 9);
+      if (!game.boss && game.enemySpawnTimer <= 0 && game.enemies.length < enemyLimit) {
+        createEnemy(game.stageElapsed);
+        game.enemySpawnTimer = Math.max(0.48, 1.72 - game.stage * 0.105);
       }
 
       game.shots.forEach((shot) => {
@@ -486,7 +559,7 @@ export function useShooterGame() {
           const dx = game.playerX - enemy.x;
           const dy = game.playerY - enemy.y;
           const length = Math.max(1, Math.hypot(dx, dy));
-          const speed = 95;
+          const speed = 95 + game.stage * 12;
           game.enemyShots.push({
             x: enemy.x,
             y: enemy.y + enemy.radius,
@@ -618,19 +691,23 @@ export function useShooterGame() {
         boss.x = WIDTH / 2 + Math.sin(boss.phase * 0.7) * 135;
         boss.fireTimer -= dt;
         if (boss.fireTimer <= 0 && boss.y >= 90) {
-          const spread = [-0.18, 0, 0.18];
+          const spread = game.stage >= 7
+            ? [-0.32, -0.21, -0.1, 0, 0.1, 0.21, 0.32]
+            : game.stage >= 4
+              ? [-0.27, -0.135, 0, 0.135, 0.27]
+              : [-0.18, 0, 0.18];
           spread.forEach((angle) => {
             game.enemyShots.push({
               x: boss.x,
               y: boss.y + 29,
-              vx: Math.sin(angle) * 100,
-              vy: Math.cos(angle) * 115,
+              vx: Math.sin(angle) * (100 + game.stage * 12),
+              vy: Math.cos(angle) * (115 + game.stage * 13),
               radius: 4.2,
               damage: 1,
               color: "#ff628b",
             });
           });
-          boss.fireTimer = 1.55;
+          boss.fireTimer = Math.max(0.5, 1.55 - game.stage * 0.085);
         }
         game.shots.forEach((shot) => {
           if (circleHit(shot.x, shot.y, shot.radius, boss.x, boss.y, 44)) {
@@ -882,7 +959,7 @@ export function useShooterGame() {
       window.cancelAnimationFrame(animationFrame);
       resizeObserver.disconnect();
     };
-  }, [updateBestScore, updateStatus]);
+  }, [completeStage, recordLeaderboard, updateBestScore, updateStatus]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -1010,6 +1087,7 @@ export function useShooterGame() {
     status,
     score,
     bestScore,
+    leaderboard,
     stage,
     lives,
     weaponLevel,

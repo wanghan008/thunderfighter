@@ -39,9 +39,9 @@ function Overlay({
     : isPaused
       ? '战场暂时冻结。准备好后，继续你的任务。'
       : isVictory
-        ? '敌方旗舰已被击溃。星域暂时安全。'
+        ? '十关挑战全部完成！你已成为星际防线的王牌飞行员。'
         : '本次出击结束。重新整备，再次进入战区。';
-  const stamp = isReady ? '第 07 区 · 战斗警报' : isPaused ? '任务暂停中' : isVictory ? '作战任务完成' : '任务失败';
+  const stamp = isReady ? '十关挑战 · 战斗警报' : isPaused ? '任务暂停中' : isVictory ? '十关挑战 · 全部通关' : '任务失败';
 
   return (
     <div className="canvas-overlay" data-testid="status-overlay">
@@ -52,7 +52,7 @@ function Overlay({
         {(status === 'gameover' || isVictory) && (
           <div className="result-line" data-testid="result-score">
             <span>本次得分</span><strong>{formatScore(score)}</strong>
-            <span>最高 {formatScore(bestScore)}</span>
+            <span>历史最高 {formatScore(bestScore)}</span>
           </div>
         )}
         <div className="overlay-actions">
@@ -87,6 +87,7 @@ function App() {
     status,
     score,
     bestScore,
+    leaderboard,
     stage,
     lives,
     weaponLevel,
@@ -125,7 +126,7 @@ function App() {
               <div className="eyebrow">街机空战 // 01</div>
               <h1>守卫星际<br /><span>防线！</span></h1>
               <p className="intro-copy">敌方舰队正在逼近。驾驶战机迎击敌军，守护我们的天空。</p>
-              <div className="mission-line">任务 01 &nbsp; / &nbsp; 深空轨道</div>
+              <div className="mission-line">十关挑战 &nbsp; / &nbsp; 击败每关首领自动进入下一关</div>
             </div>
           </div>
 
@@ -154,13 +155,13 @@ function App() {
           {isActive && (
             <div className="hud-top" aria-live="polite">
               <div className="hud-item">得分<strong data-testid="value-score">{formatScore(score)}</strong></div>
-              <div className="hud-item" style={{ textAlign: 'center' }}>关卡<strong data-testid="value-stage">{String(stage).padStart(2, '0')}</strong></div>
+              <div className="hud-item" style={{ textAlign: 'center' }}>关卡<strong data-testid="value-stage">{String(stage).padStart(2, '0')} / 10</strong></div>
               <div className="hud-item" style={{ textAlign: 'right' }}>火力<strong data-testid="value-weapon-level">LV.{weaponLevel}</strong></div>
             </div>
           )}
           {showBoss && (
             <div className="boss-health" data-testid="boss-health">
-              <div className="boss-caption"><span>敌方旗舰</span><span>{Math.round(bossPercent)}%</span></div>
+              <div className="boss-caption"><span>第 {stage} 关 · 关底首领</span><span>{Math.round(bossPercent)}%</span></div>
               <div className="boss-track"><div className="boss-fill" style={{ width: `${bossPercent}%` }} /></div>
             </div>
           )}
@@ -215,6 +216,30 @@ function App() {
           </button>
           <div className="rail-note">击落敌机有机会掉落紫色多排弹强化。连续击落 4 架内必出，效果持续 10 秒。</div>
         </aside>
+      </section>
+
+      <section className="leaderboard-panel" aria-label="历史积分排行榜">
+        <div className="leaderboard-heading">
+          <div>
+            <div className="eyebrow">飞行员荣誉榜 // TOP 10</div>
+            <h2>历史积分排行榜</h2>
+          </div>
+          <span>本设备保存 · 按最高得分排序</span>
+        </div>
+        {leaderboard.length > 0 ? (
+          <ol className="leaderboard-list">
+            {leaderboard.slice(0, 10).map((entry, index) => (
+              <li className="leaderboard-entry" key={`${entry.date}-${index}`}>
+                <span className="leaderboard-rank">{String(index + 1).padStart(2, '0')}</span>
+                <strong>{formatScore(entry.score)}</strong>
+                <span>第 {entry.stage} 关</span>
+                <time dateTime={entry.date}>{new Date(entry.date).toLocaleDateString('zh-CN')}</time>
+              </li>
+            ))}
+          </ol>
+        ) : (
+          <p className="leaderboard-empty">尚无出击记录。完成一次挑战后，你的成绩将登上排行榜。</p>
+        )}
       </section>
 
       <footer className="footer-line">
