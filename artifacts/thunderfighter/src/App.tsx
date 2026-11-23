@@ -41,7 +41,7 @@ function Overlay({
       : isVictory
         ? '敌方旗舰已被击溃。星域暂时安全。'
         : '本次出击结束。重新整备，再次进入战区。';
-  const stamp = isReady ? 'Sector 07 · Combat alert' : isPaused ? 'Mission on hold' : isVictory ? 'Operation complete' : 'Mission failed';
+  const stamp = isReady ? '第 07 区 · 战斗警报' : isPaused ? '任务暂停中' : isVictory ? '作战任务完成' : '任务失败';
 
   return (
     <div className="canvas-overlay" data-testid="status-overlay">
@@ -51,8 +51,8 @@ function Overlay({
         <p className="overlay-copy">{copy}</p>
         {(status === 'gameover' || isVictory) && (
           <div className="result-line" data-testid="result-score">
-            <span>FINAL SCORE</span><strong>{formatScore(score)}</strong>
-            <span>BEST {formatScore(bestScore)}</span>
+            <span>本次得分</span><strong>{formatScore(score)}</strong>
+            <span>最高 {formatScore(bestScore)}</span>
           </div>
         )}
         <div className="overlay-actions">
@@ -75,7 +75,7 @@ function Overlay({
             </button>
           )}
         </div>
-        {isReady && <div className="overlay-hint">SELECT START MISSION TO DEPLOY</div>}
+        {isReady && <div className="overlay-hint">点击「开始出击」进入战场</div>}
       </div>
     </div>
   );
@@ -112,37 +112,37 @@ function App() {
           <div className="brand-mark" aria-hidden="true"><Crosshair size={22} strokeWidth={2.6} /></div>
           <div>
             <p className="brand-title">雷霆战机</p>
-            <div className="brand-sub">THUNDER SQUADRON / 01</div>
+            <div className="brand-sub">雷霆中队 / 01</div>
           </div>
         </div>
-        <div className="top-status"><span className="signal" /> ORBITAL DEFENSE <span>·</span> ONLINE</div>
+        <div className="top-status"><span className="signal" /> 星际防御 <span>·</span> 系统在线</div>
       </header>
 
       <section className="game-layout" aria-label="雷霆战机游戏">
         <aside className="side-column">
           <div className="intro">
             <div>
-              <div className="eyebrow">Arcade combat // 01</div>
-              <h1>Hold the<br /><span>frontline.</span></h1>
-              <p className="intro-copy">A hostile fleet is closing in. Pilot the interceptor. Keep the sky clear.</p>
-              <div className="mission-line">MISSION 01 &nbsp; / &nbsp; DEEP ORBIT</div>
+              <div className="eyebrow">街机空战 // 01</div>
+              <h1>守卫星际<br /><span>防线！</span></h1>
+              <p className="intro-copy">敌方舰队正在逼近。驾驶战机迎击敌军，守护我们的天空。</p>
+              <div className="mission-line">任务 01 &nbsp; / &nbsp; 深空轨道</div>
             </div>
           </div>
 
           <div className="stat-panel left-stat">
-            <div className="panel-label">Personal best <Shield size={13} /></div>
+            <div className="panel-label">历史最高分 <Shield size={13} /></div>
             <div className="score-number" data-testid="value-best-score">{formatScore(bestScore)}</div>
-            <div className="score-foot">TOP FLIGHT SCORE</div>
+            <div className="score-foot">最佳出击成绩</div>
           </div>
 
           <div className="stat-panel">
-            <div className="panel-label">Flight controls <span>PC / KEYBOARD</span></div>
+            <div className="panel-label">操作说明 <span>电脑 / 键盘</span></div>
             <div className="control-list">
-              <div className="control-row"><span>Steer fighter</span><span className="kbd-group"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></span></div>
-              <div className="control-row"><span>Alternate move</span><span className="kbd-group"><kbd>←</kbd><kbd>↑</kbd><kbd>↓</kbd><kbd>→</kbd></span></div>
-              <div className="control-row"><span>Fire cannons</span><kbd>SPACE</kbd></div>
-              <div className="control-row"><span>Deploy bomb</span><span className="kbd-group"><kbd>SHIFT</kbd><kbd>/</kbd><kbd>X</kbd></span></div>
-              <div className="control-row"><span>Pause mission</span><kbd>ESC</kbd></div>
+              <div className="control-row"><span>移动战机</span><span className="kbd-group"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></span></div>
+              <div className="control-row"><span>方向键移动</span><span className="kbd-group"><kbd>←</kbd><kbd>↑</kbd><kbd>↓</kbd><kbd>→</kbd></span></div>
+              <div className="control-row"><span>发射炮弹</span><kbd>空格</kbd></div>
+              <div className="control-row"><span>释放炸弹</span><span className="kbd-group"><kbd>Shift</kbd><kbd>/</kbd><kbd>X</kbd></span></div>
+              <div className="control-row"><span>暂停游戏</span><kbd>ESC</kbd></div>
             </div>
           </div>
         </aside>
@@ -153,31 +153,31 @@ function App() {
 
           {isActive && (
             <div className="hud-top" aria-live="polite">
-              <div className="hud-item">Score<strong data-testid="value-score">{formatScore(score)}</strong></div>
-              <div className="hud-item" style={{ textAlign: 'center' }}>Stage<strong data-testid="value-stage">{String(stage).padStart(2, '0')}</strong></div>
-              <div className="hud-item" style={{ textAlign: 'right' }}>Weapon<strong data-testid="value-weapon-level">LV.{weaponLevel}</strong></div>
+              <div className="hud-item">得分<strong data-testid="value-score">{formatScore(score)}</strong></div>
+              <div className="hud-item" style={{ textAlign: 'center' }}>关卡<strong data-testid="value-stage">{String(stage).padStart(2, '0')}</strong></div>
+              <div className="hud-item" style={{ textAlign: 'right' }}>火力<strong data-testid="value-weapon-level">LV.{weaponLevel}</strong></div>
             </div>
           )}
           {showBoss && (
             <div className="boss-health" data-testid="boss-health">
-              <div className="boss-caption"><span>HOSTILE FLAGSHIP</span><span>{Math.round(bossPercent)}%</span></div>
+              <div className="boss-caption"><span>敌方旗舰</span><span>{Math.round(bossPercent)}%</span></div>
               <div className="boss-track"><div className="boss-fill" style={{ width: `${bossPercent}%` }} /></div>
             </div>
           )}
           {isActive && spreadBuffTime > 0 && (
             <div className="buff-indicator" data-testid="status-spread-buff">
               <span className="buff-symbol" aria-hidden="true">Ⅲ</span>
-              <span>SPREAD FIRE</span>
-              <strong>{spreadBuffTime.toFixed(1)}s</strong>
+              <span>多排弹强化</span>
+              <strong>{spreadBuffTime.toFixed(1)}秒</strong>
             </div>
           )}
           {isActive && (
             <div className="hud-bottom">
-              <div className="hud-lives" aria-label={`${lives} lives remaining`} data-testid="value-lives">
-                <span>HULL</span>{Array.from({ length: 5 }, (_, index) => <span key={index} className={`life-pip${index >= visibleLives ? ' empty' : ''}`} />)}
+              <div className="hud-lives" aria-label={`剩余 ${lives} 条生命`} data-testid="value-lives">
+                <span>装甲</span>{Array.from({ length: 5 }, (_, index) => <span key={index} className={`life-pip${index >= visibleLives ? ' empty' : ''}`} />)}
                 <span>{lives}</span>
               </div>
-              <div className="hud-item" style={{ textAlign: 'right' }}>ORDNANCE <strong data-testid="value-bombs">{bombCount}</strong></div>
+              <div className="hud-item" style={{ textAlign: 'right' }}>炸弹 <strong data-testid="value-bombs">{bombCount}</strong></div>
             </div>
           )}
 
@@ -193,33 +193,33 @@ function App() {
 
         <aside className="action-rail">
           <div className="stat-panel">
-            <div className="panel-label">Run telemetry <Zap size={13} /></div>
+            <div className="panel-label">本局数据 <Zap size={13} /></div>
             <div className="score-number" data-testid="value-live-score">{formatScore(score)}</div>
-            <div className="score-foot">CURRENT FLIGHT</div>
+            <div className="score-foot">当前得分</div>
           </div>
           {isActive ? (
             <button className="rail-button" onClick={pauseGame} data-testid="button-pause">
-              <span><Pause size={14} style={{ verticalAlign: 'middle', marginRight: 8 }} />PAUSE MISSION</span><span>ESC</span>
+              <span><Pause size={14} style={{ verticalAlign: 'middle', marginRight: 8 }} />暂停游戏</span><span>ESC</span>
             </button>
           ) : status === 'paused' ? (
             <button className="rail-button" onClick={resumeGame} data-testid="button-resume-rail">
-              <span><Play size={14} style={{ verticalAlign: 'middle', marginRight: 8 }} />RESUME MISSION</span><ArrowUpRight size={14} />
+              <span><Play size={14} style={{ verticalAlign: 'middle', marginRight: 8 }} />继续游戏</span><ArrowUpRight size={14} />
             </button>
           ) : (
             <button className="rail-button" onClick={status === 'ready' ? startGame : restartGame} data-testid="button-quick-start">
-              <span><Play size={14} style={{ verticalAlign: 'middle', marginRight: 8 }} />{status === 'ready' ? 'START MISSION' : 'REDEPLOY'}</span><ArrowUpRight size={14} />
+              <span><Play size={14} style={{ verticalAlign: 'middle', marginRight: 8 }} />{status === 'ready' ? '开始游戏' : '重新出击'}</span><ArrowUpRight size={14} />
             </button>
           )}
           <button className="rail-button" onClick={activateBomb} disabled={!isActive || bombCount <= 0} data-testid="button-activate-bomb">
-            <span><Bomb size={15} style={{ verticalAlign: 'middle', marginRight: 8 }} />TACTICAL BOMB</span><span className="rail-value">{bombCount}×</span>
+            <span><Bomb size={15} style={{ verticalAlign: 'middle', marginRight: 8 }} />战术炸弹</span><span className="rail-value">{bombCount}×</span>
           </button>
           <div className="rail-note">击落敌机有机会掉落紫色多排弹强化。连续击落 4 架内必出，效果持续 10 秒。</div>
         </aside>
       </section>
 
       <footer className="footer-line">
-        <span>THUNDER SQUADRON &nbsp; / &nbsp; FLIGHT SYSTEMS ONLINE</span>
-        <span>WASD / ARROWS &nbsp; · &nbsp; SPACE TO FIRE</span>
+        <span>雷霆中队 &nbsp; / &nbsp; 飞行系统运行中</span>
+        <span>WASD / 方向键 &nbsp; · &nbsp; 空格键射击</span>
       </footer>
     </main>
   );
