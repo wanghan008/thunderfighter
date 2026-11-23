@@ -349,10 +349,6 @@ export function useShooterGame() {
       game.boss.hp -= 10;
       setBossHealth(Math.max(0, game.boss.hp));
       if (game.boss.hp <= 0) {
-        game.score += 3000;
-        game.boss = null;
-        setScore(game.score);
-        setBossHealth(0);
         completeStage();
       }
     }
