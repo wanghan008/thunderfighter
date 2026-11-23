@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "雷霆战机"
+description = "一款可在 Windows 浏览器游玩的原创纵版射击游戏，包含键盘操控、敌机波次、武器升级和 Boss 战。"
+version = "1.0.0"
+id = "artifacts/thunderfighter"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 25760
+
+[services.development]
+run = "pnpm --filter @workspace/thunderfighter run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/thunderfighter", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/thunderfighter/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "25760"
+BASE_PATH = "/"
