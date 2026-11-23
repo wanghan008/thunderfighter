@@ -262,7 +262,8 @@ export function useShooterGame() {
   const completeStage = useCallback(() => {
     const game = runtimeRef.current;
     if (statusRef.current !== "running" || game.boss === null) return;
-    game.score += 500 * game.stage;
+    const clearedStage = game.stage;
+    game.score += 1000 + 500 * clearedStage;
     game.boss = null;
     game.bossSpawned = false;
     game.stageElapsed = 0;
@@ -276,6 +277,8 @@ export function useShooterGame() {
     setBossHealth(0);
     setBossMaxHealth(0);
     if (game.stage > 10) {
+      game.score += 10000;
+      setScore(game.score);
       if (!game.scoreSubmitted) {
         game.scoreSubmitted = true;
         recordLeaderboard(game.score, 10);
