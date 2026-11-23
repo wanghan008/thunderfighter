@@ -245,6 +245,27 @@ kbd {
 .boss-caption { display: flex; justify-content: space-between; margin-bottom: 5px; color: #ff9380; font: 9px var(--app-font-mono); letter-spacing: .15em; }
 .boss-track { height: 5px; border: 1px solid rgba(255, 127, 104, .42); background: rgba(32, 12, 18, .76); }
 .boss-fill { height: 100%; background: linear-gradient(90deg, #eb584f, #ffb067); transition: width .22s ease; }
+.buff-indicator {
+  position: absolute;
+  z-index: 2;
+  bottom: 43px;
+  left: 50%;
+  display: flex;
+  min-height: 25px;
+  padding: 4px 9px;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid rgba(215, 149, 255, .62);
+  color: #e4c4ff;
+  background: rgba(34, 18, 51, .88);
+  box-shadow: 0 0 15px rgba(192, 109, 255, .24);
+  font: 8px var(--app-font-mono);
+  letter-spacing: .1em;
+  transform: translateX(-50%);
+  animation: buff-pulse 1.2s ease-in-out infinite alternate;
+}
+.buff-symbol { color: #d795ff; font-size: 13px; font-weight: 700; }
+.buff-indicator strong { color: #fff0a9; font-size: 9px; }
 .action-rail { display: flex; flex-direction: column; gap: 10px; }
 .rail-button {
   display: flex;
@@ -267,6 +288,7 @@ kbd {
 .footer-line { display: flex; max-width: 1250px; margin: 18px auto 0; justify-content: space-between; color: #61747d; font: 9px var(--app-font-mono); letter-spacing: .13em; }
 .footer-line span:last-child { color: #81969e; }
 @keyframes reveal { from { opacity: 0; transform: translateY(9px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes buff-pulse { from { box-shadow: 0 0 9px rgba(192, 109, 255, .16); } to { box-shadow: 0 0 17px rgba(192, 109, 255, .36); } }
 
 @media (max-width: 900px) {
   .game-layout { grid-template-columns: minmax(190px, .8fr) minmax(320px, 1.2fr); gap: 24px; }

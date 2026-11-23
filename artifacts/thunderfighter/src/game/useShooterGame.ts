@@ -29,6 +29,7 @@ type Drop = {
   radius: number;
   speed: number;
   phase: number;
+  kind: "weapon" | "spread";
 };
 
 type Particle = {
@@ -70,6 +71,7 @@ type Runtime = {
   weaponLevel: number;
   bombCount: number;
   bombFlash: number;
+  spreadBuffTime: number;
 };
 
 const WIDTH = 480;
@@ -96,6 +98,7 @@ function createRuntime(): Runtime {
     weaponLevel: 1,
     bombCount: 2,
     bombFlash: 0,
+    spreadBuffTime: 0,
   };
 }
 
@@ -184,6 +187,7 @@ export function useShooterGame() {
   const [bossHealth, setBossHealth] = useState(0);
   const [bossMaxHealth, setBossMaxHealth] = useState(0);
   const [bombCount, setBombCount] = useState(2);
+  const [spreadBuffTime, setSpreadBuffTime] = useState(0);
   const bestScoreRef = useRef(bestScore);
 
   useEffect(() => {
@@ -214,6 +218,7 @@ export function useShooterGame() {
     setBossHealth(0);
     setBossMaxHealth(0);
     setBombCount(2);
+    setSpreadBuffTime(0);
     updateStatus("running");
   }, [updateStatus]);
 
@@ -333,7 +338,7 @@ export function useShooterGame() {
         maxHp: heavy ? 3 : 1,
         speed: (heavy ? 58 : 84) + Math.min(elapsed * 0.35, 28),
         phase: Math.random() * Math.PI * 2,
-        fireTimer: 1.15 + Math.random() * 1.4,
+        fireTimer: 2 + Math.random() * 1.6,
       });
     };
 
@@ -378,8 +383,15 @@ export function useShooterGame() {
 
     const firePlayerShots = () => {
       const game = runtimeRef.current;
-      const patterns =
-        game.weaponLevel === 1
+      const patterns = game.spreadBuffTime > 0
+        ? [
+            { offset: -28, vx: -34 },
+            { offset: -14, vx: -18 },
+            { offset: 0, vx: 0 },
+            { offset: 14, vx: 18 },
+            { offset: 28, vx: 34 },
+          ]
+        : game.weaponLevel === 1
           ? [{ offset: 0, vx: 0 }]
           : game.weaponLevel === 2
             ? [
@@ -431,8 +443,9 @@ export function useShooterGame() {
       game.fireTimer -= dt;
       if (keysRef.current.has("Space") && game.fireTimer <= 0) {
         firePlayerShots();
-        game.fireTimer = 0.145;
+        game.fireTimer = game.spreadBuffTime > 0 ? 0.115 : 0.145;
       }
+      game.spreadBuffTime = Math.max(0, game.spreadBuffTime - dt);
 
       const nextStage = Math.floor(game.elapsed / 17) + 1;
       if (nextStage !== Math.floor((game.elapsed - dt) / 17) + 1) {
@@ -443,9 +456,9 @@ export function useShooterGame() {
       }
 
       game.enemySpawnTimer -= dt;
-      if (!game.boss && game.enemySpawnTimer <= 0) {
+      if (!game.boss && game.enemySpawnTimer <= 0 && game.enemies.length < 4) {
         createEnemy(game.elapsed);
-        game.enemySpawnTimer = Math.max(0.45, 1.05 - game.elapsed * 0.008);
+        game.enemySpawnTimer = Math.max(1.1, 1.75 - game.elapsed * 0.004);
       }
 
       game.shots.forEach((shot) => {
@@ -465,17 +478,17 @@ export function useShooterGame() {
           const dx = game.playerX - enemy.x;
           const dy = game.playerY - enemy.y;
           const length = Math.max(1, Math.hypot(dx, dy));
-          const speed = 145;
+          const speed = 95;
           game.enemyShots.push({
             x: enemy.x,
             y: enemy.y + enemy.radius,
             vx: (dx / length) * speed,
             vy: (dy / length) * speed,
-            radius: 4,
+            radius: 3.6,
             damage: 1,
             color: "#ff728e",
           });
-          enemy.fireTimer = 1.9 + Math.random() * 1.1;
+          enemy.fireTimer = 3.4 + Math.random() * 1.2;
         }
       });
       game.enemies = game.enemies.filter((enemy) => enemy.y < HEIGHT + 45);
@@ -530,13 +543,24 @@ export function useShooterGame() {
       defeated.forEach((enemy) => {
         game.score += enemy.maxHp > 1 ? 180 : 100;
         emitExplosion(enemy.x, enemy.y, enemy.maxHp > 1 ? "#ffa86d" : "#ff729f");
-        if (Math.random() < 0.11 && game.weaponLevel < 3) {
+        const dropRoll = Math.random();
+        if (dropRoll < 0.1) {
           game.drops.push({
             x: enemy.x,
             y: enemy.y,
             radius: 10,
             speed: 68,
             phase: Math.random() * Math.PI * 2,
+            kind: "spread",
+          });
+        } else if (dropRoll < 0.2 && game.weaponLevel < 3) {
+          game.drops.push({
+            x: enemy.x,
+            y: enemy.y,
+            radius: 10,
+            speed: 68,
+            phase: Math.random() * Math.PI * 2,
+            kind: "weapon",
           });
         }
       });
@@ -557,7 +581,10 @@ export function useShooterGame() {
           )
         ) {
           drop.y = HEIGHT + 50;
-          if (game.weaponLevel < 3) {
+          if (drop.kind === "spread") {
+            game.spreadBuffTime = 10;
+            setSpreadBuffTime(10);
+          } else if (game.weaponLevel < 3) {
             game.weaponLevel += 1;
             setWeaponLevel(game.weaponLevel);
           } else {
@@ -575,19 +602,19 @@ export function useShooterGame() {
         boss.x = WIDTH / 2 + Math.sin(boss.phase * 0.7) * 135;
         boss.fireTimer -= dt;
         if (boss.fireTimer <= 0 && boss.y >= 90) {
-          const spread = [-0.34, -0.17, 0, 0.17, 0.34];
+          const spread = [-0.18, 0, 0.18];
           spread.forEach((angle) => {
             game.enemyShots.push({
               x: boss.x,
               y: boss.y + 29,
-              vx: Math.sin(angle) * 155,
-              vy: Math.cos(angle) * 175,
-              radius: 5,
+              vx: Math.sin(angle) * 100,
+              vy: Math.cos(angle) * 115,
+              radius: 4.2,
               damage: 1,
               color: "#ff628b",
             });
           });
-          boss.fireTimer = 0.82;
+          boss.fireTimer = 1.55;
         }
         game.shots.forEach((shot) => {
           if (circleHit(shot.x, shot.y, shot.radius, boss.x, boss.y, 44)) {
@@ -616,6 +643,7 @@ export function useShooterGame() {
         if (game.boss) {
           setBossHealth(Math.max(0, Math.ceil(game.boss.hp)));
         }
+        setSpreadBuffTime(Number(game.spreadBuffTime.toFixed(1)));
       }
     };
 
@@ -667,9 +695,11 @@ export function useShooterGame() {
         ctx.save();
         ctx.translate(drop.x, drop.y);
         ctx.rotate(game.elapsed * 1.4);
-        ctx.shadowColor = "#70f7d4";
+        const isSpread = drop.kind === "spread";
+        const powerColor = isSpread ? "#d795ff" : "#70f7d4";
+        ctx.shadowColor = powerColor;
         ctx.shadowBlur = 18;
-        ctx.fillStyle = "#70f7d4";
+        ctx.fillStyle = powerColor;
         ctx.beginPath();
         ctx.moveTo(0, -drop.radius);
         ctx.lineTo(drop.radius, 0);
@@ -678,11 +708,18 @@ export function useShooterGame() {
         ctx.closePath();
         ctx.fill();
         ctx.shadowBlur = 0;
-        ctx.fillStyle = "#08202a";
-        ctx.font = "bold 11px sans-serif";
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        ctx.fillText("+", 0, 0);
+        if (isSpread) {
+          ctx.fillStyle = "#251336";
+          ctx.fillRect(-4.5, -4, 2, 8);
+          ctx.fillRect(-1, -6, 2, 12);
+          ctx.fillRect(2.5, -4, 2, 8);
+        } else {
+          ctx.fillStyle = "#08202a";
+          ctx.font = "bold 11px sans-serif";
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.fillText("+", 0, 0);
+        }
         ctx.restore();
       });
 
@@ -882,6 +919,7 @@ export function useShooterGame() {
     bossHealth,
     bossMaxHealth,
     bombCount,
+    spreadBuffTime,
     startGame,
     pauseGame,
     resumeGame,

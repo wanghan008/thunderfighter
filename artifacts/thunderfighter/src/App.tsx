@@ -93,6 +93,7 @@ function App() {
     bossHealth,
     bossMaxHealth,
     bombCount,
+    spreadBuffTime,
     startGame,
     pauseGame,
     resumeGame,
@@ -162,6 +163,13 @@ function App() {
               <div className="boss-track"><div className="boss-fill" style={{ width: `${bossPercent}%` }} /></div>
             </div>
           )}
+          {isActive && spreadBuffTime > 0 && (
+            <div className="buff-indicator" data-testid="status-spread-buff">
+              <span className="buff-symbol" aria-hidden="true">Ⅲ</span>
+              <span>SPREAD FIRE</span>
+              <strong>{spreadBuffTime.toFixed(1)}s</strong>
+            </div>
+          )}
           {isActive && (
             <div className="hud-bottom">
               <div className="hud-lives" aria-label={`${lives} lives remaining`} data-testid="value-lives">
@@ -204,7 +212,7 @@ function App() {
           <button className="rail-button" onClick={activateBomb} disabled={!isActive || bombCount <= 0} data-testid="button-activate-bomb">
             <span><Bomb size={15} style={{ verticalAlign: 'middle', marginRight: 8 }} />TACTICAL BOMB</span><span className="rail-value">{bombCount}×</span>
           </button>
-          <div className="rail-note">Smart targeting engaged.<br />Hold fire to suppress incoming waves.</div>
+          <div className="rail-note">Collect violet drops for five-lane fire.<br />The spread boost lasts 10 seconds.</div>
         </aside>
       </section>
 
