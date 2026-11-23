@@ -212,7 +212,7 @@ function App() {
           <button className="rail-button" onClick={activateBomb} disabled={!isActive || bombCount <= 0} data-testid="button-activate-bomb">
             <span><Bomb size={15} style={{ verticalAlign: 'middle', marginRight: 8 }} />TACTICAL BOMB</span><span className="rail-value">{bombCount}×</span>
           </button>
-          <div className="rail-note">Collect violet drops for five-lane fire.<br />The spread boost lasts 10 seconds.</div>
+          <div className="rail-note">击落敌机有机会掉落紫色多排弹强化。连续击落 4 架内必出，效果持续 10 秒。</div>
         </aside>
       </section>
 

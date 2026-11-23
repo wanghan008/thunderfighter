@@ -72,6 +72,7 @@ type Runtime = {
   bombCount: number;
   bombFlash: number;
   spreadBuffTime: number;
+  killsSinceSpreadDrop: number;
 };
 
 const WIDTH = 480;
@@ -99,6 +100,7 @@ function createRuntime(): Runtime {
     bombCount: 2,
     bombFlash: 0,
     spreadBuffTime: 0,
+    killsSinceSpreadDrop: 0,
   };
 }
 
@@ -544,16 +546,19 @@ export function useShooterGame() {
         game.score += enemy.maxHp > 1 ? 180 : 100;
         emitExplosion(enemy.x, enemy.y, enemy.maxHp > 1 ? "#ffa86d" : "#ff729f");
         const dropRoll = Math.random();
-        if (dropRoll < 0.1) {
+        game.killsSinceSpreadDrop += 1;
+        const guaranteedBuff = game.killsSinceSpreadDrop >= 4;
+        if (dropRoll < 0.35 || guaranteedBuff) {
           game.drops.push({
             x: enemy.x,
             y: enemy.y,
-            radius: 10,
-            speed: 68,
+            radius: 14,
+            speed: 46,
             phase: Math.random() * Math.PI * 2,
             kind: "spread",
           });
-        } else if (dropRoll < 0.2 && game.weaponLevel < 3) {
+          game.killsSinceSpreadDrop = 0;
+        } else if (dropRoll < 0.5 && game.weaponLevel < 3) {
           game.drops.push({
             x: enemy.x,
             y: enemy.y,
@@ -590,7 +595,12 @@ export function useShooterGame() {
           } else {
             game.score += 250;
           }
-          emitExplosion(drop.x, drop.y, "#70f7d4", 8);
+          emitExplosion(
+            drop.x,
+            drop.y,
+            drop.kind === "spread" ? "#d795ff" : "#70f7d4",
+            10,
+          );
         }
       });
       game.drops = game.drops.filter((drop) => drop.y < HEIGHT + 20);
@@ -698,7 +708,14 @@ export function useShooterGame() {
         const isSpread = drop.kind === "spread";
         const powerColor = isSpread ? "#d795ff" : "#70f7d4";
         ctx.shadowColor = powerColor;
-        ctx.shadowBlur = 18;
+        ctx.shadowBlur = isSpread ? 28 : 18;
+        if (isSpread) {
+          ctx.beginPath();
+          ctx.arc(0, 0, drop.radius + 5, 0, Math.PI * 2);
+          ctx.strokeStyle = "rgba(231, 184, 255, 0.9)";
+          ctx.lineWidth = 2;
+          ctx.stroke();
+        }
         ctx.fillStyle = powerColor;
         ctx.beginPath();
         ctx.moveTo(0, -drop.radius);
