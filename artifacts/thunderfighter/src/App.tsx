@@ -149,6 +149,7 @@ function App() {
 
         <div className="game-frame" data-testid="game-canvas-frame">
           <canvas className="game-canvas" ref={canvasRef} aria-label="雷霆战机游戏画面" data-testid="game-canvas" />
+          {isActive && <div className="mobile-drag-hint" aria-hidden="true">按住并拖动战机 · 松手停止射击</div>}
 
           {isActive && (
             <div className="hud-top" aria-live="polite">

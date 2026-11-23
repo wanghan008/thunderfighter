@@ -180,6 +180,8 @@ export function useShooterGame() {
   const runtimeRef = useRef<Runtime>(createRuntime());
   const statusRef = useRef<GameStatus>("ready");
   const keysRef = useRef(new Set<string>());
+  const touchActiveRef = useRef(false);
+  const touchPointerIdRef = useRef<number | null>(null);
   const [status, setStatus] = useState<GameStatus>("ready");
   const [score, setScore] = useState(0);
   const [bestScore, setBestScore] = useState(readBestScore);
@@ -213,6 +215,8 @@ export function useShooterGame() {
   const startGame = useCallback(() => {
     runtimeRef.current = createRuntime();
     keysRef.current.clear();
+    touchActiveRef.current = false;
+    touchPointerIdRef.current = null;
     setScore(0);
     setStage(1);
     setLives(3);
@@ -227,6 +231,8 @@ export function useShooterGame() {
   const pauseGame = useCallback(() => {
     if (statusRef.current === "running") {
       keysRef.current.clear();
+      touchActiveRef.current = false;
+      touchPointerIdRef.current = null;
       updateStatus("paused");
     }
   }, [updateStatus]);
@@ -443,7 +449,7 @@ export function useShooterGame() {
       );
 
       game.fireTimer -= dt;
-      if (keysRef.current.has("Space") && game.fireTimer <= 0) {
+      if ((keysRef.current.has("Space") || touchActiveRef.current) && game.fireTimer <= 0) {
         firePlayerShots();
         game.fireTimer = game.spreadBuffTime > 0 ? 0.115 : 0.145;
       }
@@ -877,6 +883,80 @@ export function useShooterGame() {
       resizeObserver.disconnect();
     };
   }, [updateBestScore, updateStatus]);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const movePlayerToPointer = (event: PointerEvent) => {
+      const bounds = canvas.getBoundingClientRect();
+      if (bounds.width <= 0 || bounds.height <= 0) return;
+
+      const game = runtimeRef.current;
+      const x = ((event.clientX - bounds.left) / bounds.width) * WIDTH;
+      const y = ((event.clientY - bounds.top) / bounds.height) * HEIGHT;
+      game.playerX = Math.max(24, Math.min(WIDTH - 24, x));
+      game.playerY = Math.max(35, Math.min(HEIGHT - 34, y));
+    };
+
+    const handlePointerDown = (event: PointerEvent) => {
+      // Only the first touch/pen pointer steers the fighter. Mouse remains keyboard-controlled.
+      if (
+        event.pointerType === "mouse" ||
+        !event.isPrimary ||
+        statusRef.current !== "running" ||
+        touchPointerIdRef.current !== null
+      ) {
+        return;
+      }
+
+      event.preventDefault();
+      touchPointerIdRef.current = event.pointerId;
+      touchActiveRef.current = true;
+      movePlayerToPointer(event);
+      try {
+        canvas.setPointerCapture(event.pointerId);
+      } catch {
+        // Pointer capture is best-effort; window-level cleanup still prevents stuck input.
+      }
+    };
+
+    const handlePointerMove = (event: PointerEvent) => {
+      if (event.pointerId !== touchPointerIdRef.current) return;
+      event.preventDefault();
+      movePlayerToPointer(event);
+    };
+
+    const stopTouchControl = (event?: PointerEvent) => {
+      if (event && event.pointerId !== touchPointerIdRef.current) return;
+      touchActiveRef.current = false;
+      touchPointerIdRef.current = null;
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState !== "visible") stopTouchControl();
+    };
+    const handleWindowBlur = () => stopTouchControl();
+
+    canvas.addEventListener("pointerdown", handlePointerDown);
+    canvas.addEventListener("pointermove", handlePointerMove);
+    canvas.addEventListener("pointerup", stopTouchControl);
+    canvas.addEventListener("pointercancel", stopTouchControl);
+    canvas.addEventListener("lostpointercapture", stopTouchControl);
+    window.addEventListener("blur", handleWindowBlur);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      canvas.removeEventListener("pointerdown", handlePointerDown);
+      canvas.removeEventListener("pointermove", handlePointerMove);
+      canvas.removeEventListener("pointerup", stopTouchControl);
+      canvas.removeEventListener("pointercancel", stopTouchControl);
+      canvas.removeEventListener("lostpointercapture", stopTouchControl);
+      window.removeEventListener("blur", handleWindowBlur);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      stopTouchControl();
+    };
+  }, []);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
