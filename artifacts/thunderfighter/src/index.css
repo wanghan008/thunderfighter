@@ -559,3 +559,26 @@ kbd {
 @media (orientation: landscape) and (max-height: 600px) and (max-width: 950px) {
   .leaderboard-panel { margin-top: 12px; }
 }
+
+
+/* Combo chain and tactical supply indicators */
+.combo-indicator {
+  position: absolute;
+  z-index: 2;
+  top: 105px;
+  left: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 7px 13px;
+  border: 1px solid rgba(245, 199, 68, .48);
+  color: #f5c744;
+  background: rgba(13, 23, 34, .78);
+  box-shadow: 0 0 18px rgba(245, 199, 68, .12);
+  transform: translateX(-50%);
+  pointer-events: none;
+  white-space: nowrap;
+}
+.combo-indicator strong { font: 800 15px var(--app-font-mono); letter-spacing: .08em; }
+.combo-indicator span { color: #9db2b8; font: 8px var(--app-font-mono); }
