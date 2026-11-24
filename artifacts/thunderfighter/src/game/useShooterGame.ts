@@ -914,7 +914,7 @@ export function useShooterGame() {
         boss.fireTimer -= dt;
         if (boss.fireTimer <= 0 && boss.y >= 90 && stage <= 3) {
           aimed(stage === 1 ? 1 : stage === 2 ? 2 : 3, 0.38);
-          boss.fireTimer = Math.max(0.75, 1.65 - stage * 0.2 - phaseBoost * 0.2);
+          boss.fireTimer = Math.max(0.75, 1.65 - stage * 0.2 - (boss.phaseIndex - 1) * 0.2);
         }
         game.shots.forEach((shot) => {
           if (circleHit(shot.x, shot.y, shot.radius, boss.x, boss.y, 46) && !shot.hitBoss) {
