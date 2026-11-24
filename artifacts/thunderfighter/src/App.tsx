@@ -95,6 +95,7 @@ function App() {
     bossMaxHealth,
     bombCount,
     spreadBuffTime,
+    combo,
     startGame,
     pauseGame,
     resumeGame,
@@ -159,6 +160,11 @@ function App() {
               <div className="hud-item" style={{ textAlign: 'right' }}>火力<strong data-testid="value-weapon-level">LV.{weaponLevel}</strong></div>
             </div>
           )}
+          {isActive && combo >= 2 && (
+            <div className="combo-indicator" data-testid="value-combo">
+              <strong>{combo} 连击</strong><span>持续击落敌机提升得分倍率</span>
+            </div>
+          )}
           {showBoss && (
             <div className="boss-health" data-testid="boss-health">
               <div className="boss-caption"><span>第 {stage} 关 · 关底首领</span><span>{Math.round(bossPercent)}%</span></div>
@@ -214,7 +220,7 @@ function App() {
           <button className="rail-button" onClick={activateBomb} disabled={!isActive || bombCount <= 0} data-testid="button-activate-bomb">
             <span><Bomb size={15} style={{ verticalAlign: 'middle', marginRight: 8 }} />战术炸弹</span><span className="rail-value">{bombCount}×</span>
           </button>
-          <div className="rail-note">击落敌机有机会掉落紫色多排弹强化。连续击落 4 架内必出，效果持续 10 秒。</div>
+          <div className="rail-note">补给说明：紫色多排弹、绿色火力、橙色炸弹、红色生命。连续击落敌机可累积连击倍率。</div>
         </aside>
       </section>
 
