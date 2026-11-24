@@ -95,6 +95,8 @@ function App() {
     bossMaxHealth,
     bombCount,
     spreadBuffTime,
+    combo,
+    shieldCharges,
     startGame,
     pauseGame,
     resumeGame,
@@ -159,6 +161,11 @@ function App() {
               <div className="hud-item" style={{ textAlign: 'right' }}>火力<strong data-testid="value-weapon-level">LV.{weaponLevel}</strong></div>
             </div>
           )}
+          {isActive && combo >= 2 && (
+            <div className="combo-indicator" data-testid="value-combo">
+              <strong>{combo} 连击</strong><span>持续击落敌机提升得分倍率</span>
+            </div>
+          )}
           {showBoss && (
             <div className="boss-health" data-testid="boss-health">
               <div className="boss-caption"><span>第 {stage} 关 · 关底首领</span><span>{Math.round(bossPercent)}%</span></div>
@@ -177,6 +184,7 @@ function App() {
               <div className="hud-lives" aria-label={`剩余 ${lives} 条生命`} data-testid="value-lives">
                 <span>装甲</span>{Array.from({ length: 5 }, (_, index) => <span key={index} className={`life-pip${index >= visibleLives ? ' empty' : ''}`} />)}
                 <span>{lives}</span>
+                {shieldCharges > 0 && <span className="shield-count">护盾 {shieldCharges}</span>}
               </div>
               <div className="hud-item" style={{ textAlign: 'right' }}>炸弹 <strong data-testid="value-bombs">{bombCount}</strong></div>
             </div>
@@ -214,7 +222,7 @@ function App() {
           <button className="rail-button" onClick={activateBomb} disabled={!isActive || bombCount <= 0} data-testid="button-activate-bomb">
             <span><Bomb size={15} style={{ verticalAlign: 'middle', marginRight: 8 }} />战术炸弹</span><span className="rail-value">{bombCount}×</span>
           </button>
-          <div className="rail-note">击落敌机有机会掉落紫色多排弹强化。连续击落 4 架内必出，效果持续 10 秒。</div>
+          <div className="rail-note">补给说明：紫色多排弹、绿色火力、橙色炸弹、红色生命、蓝色护盾（抵挡一次伤害）。连续击落敌机可累积连击倍率。</div>
         </aside>
       </section>
 

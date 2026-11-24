@@ -29,7 +29,7 @@ type Drop = {
   radius: number;
   speed: number;
   phase: number;
-  kind: "weapon" | "spread";
+  kind: "weapon" | "spread" | "bomb" | "life" | "shield";
 };
 
 type Particle = {
@@ -82,6 +82,9 @@ type Runtime = {
   bombFlash: number;
   spreadBuffTime: number;
   killsSinceSpreadDrop: number;
+  combo: number;
+  comboTimer: number;
+  shieldCharges: number;
 };
 
 const WIDTH = 480;
@@ -113,6 +116,9 @@ function createRuntime(): Runtime {
     bombFlash: 0,
     spreadBuffTime: 0,
     killsSinceSpreadDrop: 0,
+    combo: 0,
+    comboTimer: 0,
+    shieldCharges: 0,
   };
 }
 
@@ -224,6 +230,8 @@ export function useShooterGame() {
   const [bossMaxHealth, setBossMaxHealth] = useState(0);
   const [bombCount, setBombCount] = useState(2);
   const [spreadBuffTime, setSpreadBuffTime] = useState(0);
+  const [combo, setCombo] = useState(0);
+  const [shieldCharges, setShieldCharges] = useState(0);
   const bestScoreRef = useRef(bestScore);
 
   useEffect(() => {
@@ -303,6 +311,8 @@ export function useShooterGame() {
     setBossMaxHealth(0);
     setBombCount(2);
     setSpreadBuffTime(0);
+    setCombo(0);
+    setShieldCharges(0);
     updateStatus("running");
   }, [updateStatus]);
 
@@ -450,6 +460,13 @@ export function useShooterGame() {
     const damagePlayer = () => {
       const game = runtimeRef.current;
       if (game.playerInvulnerable > 0 || statusRef.current !== "running") return;
+      if (game.shieldCharges > 0) {
+        game.shieldCharges -= 1;
+        game.playerInvulnerable = 1.35;
+        setShieldCharges(game.shieldCharges);
+        emitExplosion(game.playerX, game.playerY, "#75d9ff", 22);
+        return;
+      }
       game.lives = Math.max(0, game.lives - 1);
       game.playerInvulnerable = 1.35;
       emitExplosion(game.playerX, game.playerY, "#75f3ff", 18);
@@ -507,6 +524,8 @@ export function useShooterGame() {
       game.stageElapsed += dt;
       game.playerInvulnerable = Math.max(0, game.playerInvulnerable - dt);
       game.bombFlash = Math.max(0, game.bombFlash - dt);
+      game.comboTimer = Math.max(0, game.comboTimer - dt);
+      if (game.comboTimer <= 0 && game.combo > 0) { game.combo = 0; setCombo(0); }
 
       const horizontal =
         Number(keysRef.current.has("ArrowRight") || keysRef.current.has("KeyD")) -
@@ -622,12 +641,16 @@ export function useShooterGame() {
 
       const defeated = game.enemies.filter((enemy) => enemy.hp <= 0);
       defeated.forEach((enemy) => {
-        game.score += enemy.maxHp > 1 ? 180 : 100;
+        game.combo += 1;
+        game.comboTimer = 2.4;
+        const comboMultiplier = Math.min(3, 1 + Math.floor(game.combo / 5) * 0.25);
+        game.score += Math.round((enemy.maxHp > 1 ? 180 : 100) * comboMultiplier);
+        setCombo(game.combo);
         emitExplosion(enemy.x, enemy.y, enemy.maxHp > 1 ? "#ffa86d" : "#ff729f");
         const dropRoll = Math.random();
         game.killsSinceSpreadDrop += 1;
         const guaranteedBuff = game.killsSinceSpreadDrop >= 4;
-        if (dropRoll < 0.35 || guaranteedBuff) {
+        if (dropRoll < 0.28 || guaranteedBuff) {
           game.drops.push({
             x: enemy.x,
             y: enemy.y,
@@ -637,7 +660,13 @@ export function useShooterGame() {
             kind: "spread",
           });
           game.killsSinceSpreadDrop = 0;
-        } else if (dropRoll < 0.5 && game.weaponLevel < 3) {
+        } else if (dropRoll < 0.34) {
+          game.drops.push({ x: enemy.x, y: enemy.y, radius: 11, speed: 58, phase: Math.random() * Math.PI * 2, kind: "bomb" });
+        } else if (dropRoll < 0.38) {
+          game.drops.push({ x: enemy.x, y: enemy.y, radius: 11, speed: 58, phase: Math.random() * Math.PI * 2, kind: "life" });
+        } else if (dropRoll < 0.43 && game.shieldCharges < 2) {
+          game.drops.push({ x: enemy.x, y: enemy.y, radius: 11, speed: 60, phase: Math.random() * Math.PI * 2, kind: "shield" });
+        } else if (dropRoll < 0.55 && game.weaponLevel < 3) {
           game.drops.push({
             x: enemy.x,
             y: enemy.y,
@@ -668,18 +697,17 @@ export function useShooterGame() {
           if (drop.kind === "spread") {
             game.spreadBuffTime = 10;
             setSpreadBuffTime(10);
+          } else if (drop.kind === "bomb") {
+            game.bombCount = Math.min(5, game.bombCount + 1); setBombCount(game.bombCount);
+          } else if (drop.kind === "life") {
+            game.lives = Math.min(5, game.lives + 1); setLives(game.lives);
+          } else if (drop.kind === "shield") {
+            game.shieldCharges = Math.min(2, game.shieldCharges + 1); setShieldCharges(game.shieldCharges);
           } else if (game.weaponLevel < 3) {
-            game.weaponLevel += 1;
-            setWeaponLevel(game.weaponLevel);
-          } else {
-            game.score += 250;
-          }
-          emitExplosion(
-            drop.x,
-            drop.y,
-            drop.kind === "spread" ? "#d795ff" : "#70f7d4",
-            10,
-          );
+            game.weaponLevel += 1; setWeaponLevel(game.weaponLevel);
+          } else { game.score += 250; }
+          const pickupColor = drop.kind === "spread" ? "#d795ff" : drop.kind === "bomb" ? "#ff9b62" : drop.kind === "life" ? "#ff6f9b" : drop.kind === "shield" ? "#63c9ff" : "#70f7d4";
+          emitExplosion(drop.x, drop.y, pickupColor, 10);
         }
       });
       game.drops = game.drops.filter((drop) => drop.y < HEIGHT + 20);
@@ -789,7 +817,7 @@ export function useShooterGame() {
         ctx.translate(drop.x, drop.y);
         ctx.rotate(game.elapsed * 1.4);
         const isSpread = drop.kind === "spread";
-        const powerColor = isSpread ? "#d795ff" : "#70f7d4";
+        const powerColor = isSpread ? "#d795ff" : drop.kind === "bomb" ? "#ff9b62" : drop.kind === "life" ? "#ff6f9b" : drop.kind === "shield" ? "#63c9ff" : "#70f7d4";
         ctx.shadowColor = powerColor;
         ctx.shadowBlur = isSpread ? 28 : 18;
         if (isSpread) {
@@ -808,18 +836,9 @@ export function useShooterGame() {
         ctx.closePath();
         ctx.fill();
         ctx.shadowBlur = 0;
-        if (isSpread) {
-          ctx.fillStyle = "#251336";
-          ctx.fillRect(-4.5, -4, 2, 8);
-          ctx.fillRect(-1, -6, 2, 12);
-          ctx.fillRect(2.5, -4, 2, 8);
-        } else {
-          ctx.fillStyle = "#08202a";
-          ctx.font = "bold 11px sans-serif";
-          ctx.textAlign = "center";
-          ctx.textBaseline = "middle";
-          ctx.fillText("+", 0, 0);
-        }
+        ctx.fillStyle = "#08202a"; ctx.font = "bold 11px sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+        const symbol = isSpread ? "Ⅲ" : drop.kind === "bomb" ? "B" : drop.kind === "life" ? "♥" : drop.kind === "shield" ? "S" : "+";
+        ctx.fillText(symbol, 0, 0);
         ctx.restore();
       });
 
@@ -918,6 +937,15 @@ export function useShooterGame() {
         (game.playerInvulnerable <= 0 || Math.floor(game.playerInvulnerable * 12) % 2 === 0)
       ) {
         ctx.save();
+        if (game.shieldCharges > 0) {
+          ctx.beginPath();
+          ctx.arc(game.playerX, game.playerY, 29, 0, Math.PI * 2);
+          ctx.strokeStyle = "rgba(99, 201, 255, 0.9)";
+          ctx.lineWidth = 2;
+          ctx.shadowColor = "#63c9ff";
+          ctx.shadowBlur = 18;
+          ctx.stroke();
+        }
         ctx.strokeStyle = "rgba(113, 246, 255, 0.75)";
         ctx.shadowColor = "#58dff2";
         ctx.shadowBlur = 14;
@@ -1095,6 +1123,8 @@ export function useShooterGame() {
     bossMaxHealth,
     bombCount,
     spreadBuffTime,
+    combo,
+    shieldCharges,
     startGame,
     pauseGame,
     resumeGame,
