@@ -331,6 +331,9 @@ export function useShooterGame() {
     const game = runtimeRef.current;
     if (statusRef.current !== "running" || game.boss === null) return;
     const clearedStage = game.stage;
+    // 每通过一关自动恢复 1 格生命，生命值不超过当前最大生命上限。
+    game.lives = Math.min(game.maxLives, game.lives + 1);
+    setLives(game.lives);
     game.score += 1000 + 500 * clearedStage;
     game.boss = null;
     game.bossSpawned = false;
