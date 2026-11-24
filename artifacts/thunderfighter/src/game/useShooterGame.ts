@@ -71,6 +71,15 @@ type Boss = {
   aoeRadius: number;
   aoeHit: boolean;
   spiralAngle: number;
+  anchorX: number;
+  spawnSide: "left" | "right";
+  sweepTimer: number;
+  sweepWarning: number;
+  sweepActive: number;
+  sweepX: number;
+  sweepDirection: number;
+  invulnerable: number;
+  shieldCooldown: number;
 };
 
 type LeaderboardEntry = {
@@ -425,7 +434,7 @@ export function useShooterGame() {
     });
     game.enemies = [];
     if (game.boss) {
-      game.boss.hp -= 10;
+      if (game.boss.invulnerable <= 0) game.boss.hp -= 10;
       setBossHealth(Math.max(0, game.boss.hp));
       if (game.boss.hp <= 0) {
         completeStage();
@@ -512,8 +521,10 @@ export function useShooterGame() {
     const spawnBoss = () => {
       const game = runtimeRef.current;
       const hp = 95 + game.stage * 42;
+      const spawnSide = Math.random() < 0.5 ? "left" : "right";
+      const anchorX = spawnSide === "left" ? 82 : WIDTH - 82;
       game.boss = {
-        x: WIDTH / 2, y: -100, hp, maxHp: hp, stage: game.stage,
+        x: anchorX, y: -100, hp, maxHp: hp, stage: game.stage,
         name: BOSS_NAMES[game.stage - 1] ?? "未知首领",
         phase: 0, phaseIndex: 1,
         attackTimer: 1.1,
@@ -521,6 +532,11 @@ export function useShooterGame() {
         aoeWarning: 0, aoeActive: 0, aoeX: WIDTH / 2, aoeY: HEIGHT * 0.72,
         aoeRadius: game.stage >= 8 ? 76 : 54, aoeHit: false,
         spiralAngle: 0,
+        anchorX, spawnSide,
+        sweepTimer: 3, sweepWarning: 0, sweepActive: 0,
+        sweepX: spawnSide === "left" ? 24 : WIDTH - 24,
+        sweepDirection: spawnSide === "left" ? 1 : -1,
+        invulnerable: 0, shieldCooldown: 6 + Math.random() * 3,
       };
       game.bossSpawned = true;
       setBossName(game.boss.name);
@@ -816,8 +832,8 @@ export function useShooterGame() {
         boss.phase += dt;
         boss.y = Math.min(93, boss.y + 85 * dt);
         const moveRate = stage >= 8 ? 1.05 : stage >= 5 ? 0.82 : 0.62;
-        const moveWidth = stage === 1 ? 88 : stage >= 8 ? 166 : 125;
-        boss.x = WIDTH / 2 + Math.sin(boss.phase * moveRate) * moveWidth;
+        const moveWidth = stage >= 8 ? 112 : stage >= 5 ? 82 : 48;
+        boss.x = Math.max(58, Math.min(WIDTH - 58, boss.anchorX + Math.sin(boss.phase * moveRate) * moveWidth));
         const hpRatio = boss.hp / boss.maxHp;
         const nextPhase = hpRatio <= 0.3 ? 3 : hpRatio <= 0.65 ? 2 : 1;
         if (nextPhase !== boss.phaseIndex) {
@@ -826,6 +842,30 @@ export function useShooterGame() {
           emitExplosion(boss.x, boss.y, nextPhase === 3 ? "#fff18a" : "#ff9b75", 20);
           boss.attackTimer = Math.min(boss.attackTimer, 0.25);
         }
+
+        // A dedicated front-facing laser sweep fires on a strict three-second cycle.
+        boss.sweepTimer -= dt;
+        if (boss.sweepTimer <= 0 && boss.sweepWarning <= 0 && boss.sweepActive <= 0) {
+          boss.sweepWarning = 0.72;
+          boss.sweepX = boss.sweepDirection > 0 ? 24 : WIDTH - 24;
+        }
+        if (boss.sweepWarning > 0) {
+          boss.sweepWarning = Math.max(0, boss.sweepWarning - dt);
+          if (boss.sweepWarning === 0) boss.sweepActive = 1.25;
+        }
+        if (boss.sweepActive > 0) {
+          boss.sweepActive = Math.max(0, boss.sweepActive - dt);
+          boss.sweepX += boss.sweepDirection * 330 * dt;
+          if (Math.abs(game.playerX - boss.sweepX) < 15 + PLAYER_RADIUS * 0.55 && game.playerY > boss.y + 24) damagePlayer();
+          if (boss.sweepActive === 0) { boss.sweepTimer = 3; boss.sweepDirection *= -1; }
+        }
+        boss.shieldCooldown -= dt;
+        if (boss.shieldCooldown <= 0 && boss.invulnerable <= 0) {
+          boss.invulnerable = 1.35;
+          boss.shieldCooldown = 8 + Math.random() * 4;
+          emitExplosion(boss.x, boss.y, "#78dfff", 16);
+        }
+        boss.invulnerable = Math.max(0, boss.invulnerable - dt);
 
         // Telegraph attacks first, then activate them so players have time to dodge.
         if (boss.laserWarning > 0) {
@@ -913,7 +953,7 @@ export function useShooterGame() {
           if (circleHit(shot.x, shot.y, shot.radius, boss.x, boss.y, 46) && !shot.hitBoss) {
             if (!shot.piercing) shot.y = -40;
             else shot.hitBoss = true;
-            boss.hp -= shot.damage;
+            if (boss.invulnerable <= 0) boss.hp -= shot.damage;
           }
         });
         if (boss.hp <= 0) {
@@ -1102,7 +1142,30 @@ export function useShooterGame() {
         }
         ctx.restore();
 
+        if (boss.invulnerable > 0) {
+          ctx.save();
+          ctx.globalAlpha = 0.42 + Math.sin(boss.phase * 24) * 0.12;
+          ctx.strokeStyle = "#8be7ff"; ctx.lineWidth = 5;
+          ctx.shadowColor = "#55cfff"; ctx.shadowBlur = 24;
+          ctx.beginPath(); ctx.ellipse(boss.x, boss.y, 78, 48, boss.phase * 0.35, 0, Math.PI * 2); ctx.stroke();
+          ctx.fillStyle = "rgba(75,190,255,0.16)"; ctx.fill();
+          ctx.fillStyle = "#c9f5ff"; ctx.font = "bold 11px sans-serif"; ctx.textAlign = "center";
+          ctx.fillText("护盾无敌", boss.x, boss.y - 53);
+          ctx.restore();
+        }
+
         // Telegraph overlays: red/pink lines and rings show where the next boss attack will land.
+        if (boss.sweepWarning > 0 || boss.sweepActive > 0) {
+          ctx.save();
+          const active = boss.sweepActive > 0;
+          ctx.globalAlpha = active ? 0.88 : 0.3 + Math.sin(boss.phase * 24) * 0.16;
+          ctx.fillStyle = active ? "#ff315e" : "#ffc0cf";
+          ctx.shadowColor = "#ff416e"; ctx.shadowBlur = active ? 28 : 8;
+          ctx.fillRect(boss.sweepX - 8, boss.y + 25, 16, HEIGHT - boss.y - 25);
+          ctx.strokeStyle = "#fff4f6"; ctx.lineWidth = 2;
+          ctx.beginPath(); ctx.moveTo(boss.sweepX, boss.y + 25); ctx.lineTo(boss.sweepX, HEIGHT); ctx.stroke();
+          ctx.restore();
+        }
         if (boss.laserWarning > 0 || boss.laserActive > 0) {
           boss.laserXs.forEach((x) => {
             ctx.save(); ctx.globalAlpha = boss.laserActive > 0 ? 0.78 : 0.28 + Math.sin(boss.phase*22)*0.14;
