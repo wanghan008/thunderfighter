@@ -1155,6 +1155,20 @@ export function useShooterGame() {
           ctx.restore();
         }
 
+        if (boss.chargeWarning > 0 || boss.chargeActive > 0) {
+          ctx.save();
+          const charging = boss.chargeActive > 0;
+          ctx.globalAlpha = charging ? 0.72 : 0.3 + Math.sin(boss.phase * 20) * 0.12;
+          ctx.strokeStyle = charging ? "#ff4d68" : "#ffd08a";
+          ctx.lineWidth = charging ? 4 : 2;
+          ctx.setLineDash(charging ? [] : [8, 7]);
+          ctx.beginPath(); ctx.moveTo(boss.x, boss.y + 20); ctx.lineTo(game.playerX, game.playerY); ctx.stroke();
+          ctx.setLineDash([]);
+          ctx.fillStyle = charging ? "#ff4d68" : "#ffd08a";
+          ctx.beginPath(); ctx.arc(game.playerX, game.playerY, charging ? 28 : 20, 0, Math.PI * 2); ctx.stroke();
+          ctx.restore();
+        }
+
         // Telegraph overlays: red/pink lines and rings show where the next boss attack will land.
         if (boss.sweepWarning > 0 || boss.sweepActive > 0) {
           ctx.save();
