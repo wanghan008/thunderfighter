@@ -27,7 +27,7 @@ type Enemy = {
   speed: number;
   phase: number;
   fireTimer: number;
-  kind: "basic" | "fast" | "heavy" | "suicide" | "tracker";
+  kind: "basic" | "fast" | "heavy" | "suicide" | "tracker" | "sniper" | "bomber" | "weaver";
 };
 
 type Drop = {
@@ -36,7 +36,7 @@ type Drop = {
   radius: number;
   speed: number;
   phase: number;
-  kind: "weapon" | "spread" | "bomb" | "life" | "shield";
+  kind: "weapon" | "spread" | "bomb" | "life" | "shield" | "rapid" | "power";
 };
 
 type Particle = {
@@ -130,6 +130,8 @@ type Runtime = {
   damageLevel: number;
   fireRateLevel: number;
   mobilityLevel: number;
+  rapidFireTime: number;
+  damageBuffTime: number;
 };
 
 const WIDTH = 480;
@@ -169,6 +171,8 @@ function createRuntime(): Runtime {
     damageLevel: 0,
     fireRateLevel: 0,
     mobilityLevel: 0,
+    rapidFireTime: 0,
+    damageBuffTime: 0,
   };
 }
 
@@ -506,20 +510,20 @@ export function useShooterGame() {
       const game = runtimeRef.current;
       const difficulty = game.stage;
       const roll = Math.random();
-      const kind: Enemy["kind"] = roll < 0.18 ? "fast" : roll < 0.31 ? "heavy" : roll < 0.43 ? "suicide" : roll < 0.58 ? "tracker" : "basic";
+      const kind: Enemy["kind"] = roll < 0.16 ? "fast" : roll < 0.27 ? "heavy" : roll < 0.38 ? "suicide" : roll < 0.51 ? "tracker" : roll < 0.63 ? "sniper" : roll < 0.76 ? "bomber" : roll < 0.88 ? "weaver" : "basic";
       const heavy = kind === "heavy";
-      const radius = heavy ? 19 : kind === "fast" || kind === "suicide" ? 11 : 13;
+      const radius = heavy ? 19 : kind === "fast" || kind === "suicide" || kind === "weaver" ? 11 : kind === "bomber" ? 16 : 13;
       const normalHp = difficulty >= 7 ? 2 : 1;
-      const hp = heavy ? 4 + Math.floor(difficulty / 3) : kind === "tracker" ? 2 : normalHp;
+      const hp = heavy ? 4 + Math.floor(difficulty / 3) : kind === "tracker" || kind === "sniper" || kind === "bomber" ? 2 : normalHp;
       game.enemies.push({
         x: radius + Math.random() * (WIDTH - radius * 2),
         y: -30,
         radius,
         hp,
         maxHp: hp,
-        speed: ((kind === "fast" ? 148 : kind === "suicide" ? 118 : heavy ? 48 : 84) + Math.min(elapsed * 0.35, 28)) * (1 + difficulty * 0.065),
+        speed: ((kind === "fast" ? 172 : kind === "suicide" ? 126 : kind === "weaver" ? 108 : kind === "sniper" ? 58 : kind === "bomber" ? 66 : heavy ? 48 : 84) + Math.min(elapsed * 0.35, 28)) * (1 + difficulty * 0.065),
         phase: Math.random() * Math.PI * 2,
-        fireTimer: kind === "tracker" || heavy ? Math.max(0.75, 2.2 - difficulty * 0.1) : 99,
+        fireTimer: ["tracker", "heavy", "sniper", "bomber"].includes(kind) ? Math.max(0.65, 1.8 - difficulty * 0.075) : 99,
         kind,
       });
     };
@@ -530,7 +534,7 @@ export function useShooterGame() {
     ];
     const spawnBoss = () => {
       const game = runtimeRef.current;
-      const hp = 95 + game.stage * 42;
+      const hp = (95 + game.stage * 42) * 5;
       const spawnSide = Math.random() < 0.5 ? "left" : "right";
       const anchorX = spawnSide === "left" ? 82 : WIDTH - 82;
       game.boss = {
@@ -616,7 +620,7 @@ export function useShooterGame() {
           vx: pattern.vx,
           vy: -470,
           radius: 3.5,
-          damage: (game.weaponType === "laser" ? 2 : 1) * (1 + game.damageLevel * 0.25),
+          damage: (game.weaponType === "laser" ? 2 : 1) * (1 + game.damageLevel * 0.25) * (game.damageBuffTime > 0 ? 1.6 : 1),
           color: game.weaponType === "laser" ? "#70f7ff" : game.weaponType === "homing" ? "#ff9b62" : game.weaponType === "spread" ? "#d795ff" : "#ffe08a",
           homing: game.weaponType === "homing",
           piercing: game.weaponType === "piercing",
@@ -656,19 +660,21 @@ export function useShooterGame() {
       game.fireTimer -= dt;
       if ((keysRef.current.has("Space") || touchActiveRef.current) && game.fireTimer <= 0) {
         firePlayerShots();
-        game.fireTimer = (game.weaponType === "laser" ? 0.19 : game.weaponType === "spread" ? 0.22 : 0.28) * Math.pow(0.85, game.fireRateLevel) * (game.spreadBuffTime > 0 ? 0.8 : 1);
+        game.fireTimer = (game.weaponType === "laser" ? 0.19 : game.weaponType === "spread" ? 0.22 : 0.28) * Math.pow(0.85, game.fireRateLevel) * (game.spreadBuffTime > 0 ? 0.8 : 1) * (game.rapidFireTime > 0 ? 0.62 : 1);
       }
       game.spreadBuffTime = Math.max(0, game.spreadBuffTime - dt);
+      game.rapidFireTime = Math.max(0, game.rapidFireTime - dt);
+      game.damageBuffTime = Math.max(0, game.damageBuffTime - dt);
 
       if (game.stageElapsed >= 22 && !game.bossSpawned) {
         spawnBoss();
       }
 
       game.enemySpawnTimer -= dt;
-      const enemyLimit = Math.min(4 + Math.floor(game.stage / 2), 9);
+      const enemyLimit = Math.min(7 + Math.floor(game.stage * 0.65), 14);
       if (!game.boss && game.enemySpawnTimer <= 0 && game.enemies.length < enemyLimit) {
         createEnemy(game.stageElapsed);
-        game.enemySpawnTimer = Math.max(0.48, 1.72 - game.stage * 0.105);
+        game.enemySpawnTimer = Math.max(0.34, 1.18 - game.stage * 0.065);
       }
 
       game.shots.forEach((shot) => {
@@ -697,24 +703,22 @@ export function useShooterGame() {
         } else if (enemy.kind === "tracker") {
           enemy.x += Math.sign(game.playerX - enemy.x) * Math.min(95 * dt, Math.abs(game.playerX - enemy.x));
         } else {
-          enemy.x += Math.sin(game.elapsed * (enemy.kind === "fast" ? 2.7 : 1.45) + enemy.phase) * (enemy.kind === "fast" ? 58 : 33) * dt;
+          const sway = enemy.kind === "weaver" ? 118 : enemy.kind === "fast" ? 58 : enemy.kind === "bomber" ? 26 : 33;
+          const frequency = enemy.kind === "weaver" ? 3.4 : enemy.kind === "fast" ? 2.7 : 1.45;
+          enemy.x += Math.sin(game.elapsed * frequency + enemy.phase) * sway * dt;
         }
         enemy.fireTimer -= dt;
-        if ((enemy.kind === "tracker" || enemy.kind === "heavy") && enemy.fireTimer <= 0 && enemy.y > 35 && enemy.y < HEIGHT * 0.75) {
+        if (["tracker", "heavy", "sniper", "bomber"].includes(enemy.kind) && enemy.fireTimer <= 0 && enemy.y > 35 && enemy.y < HEIGHT * 0.75) {
           const dx = game.playerX - enemy.x;
           const dy = game.playerY - enemy.y;
           const length = Math.max(1, Math.hypot(dx, dy));
-          const speed = 95 + game.stage * 12;
-          game.enemyShots.push({
-            x: enemy.x,
-            y: enemy.y + enemy.radius,
-            vx: (dx / length) * speed,
-            vy: (dy / length) * speed,
-            radius: 3.6,
-            damage: 1,
-            color: "#ff728e",
-          });
-          enemy.fireTimer = (enemy.kind === "heavy" ? 2.5 : 1.8) + Math.random() * 0.9;
+          const speed = (enemy.kind === "sniper" ? 190 : enemy.kind === "bomber" ? 112 : 95) + game.stage * 10;
+          const fireOne = (angle: number, color = "#ff728e") => game.enemyShots.push({ x: enemy.x, y: enemy.y + enemy.radius, vx: Math.sin(angle) * speed, vy: Math.cos(angle) * speed, radius: enemy.kind === "sniper" ? 4.4 : 3.6, damage: 1, color });
+          const aim = Math.atan2(dx, dy);
+          if (enemy.kind === "bomber") {
+            for (let i = -1; i <= 1; i += 1) fireOne(aim + i * 0.28, "#ffad62");
+          } else fireOne(aim, enemy.kind === "sniper" ? "#ffdf72" : "#ff728e");
+          enemy.fireTimer = (enemy.kind === "heavy" ? 2.5 : enemy.kind === "sniper" ? 2.8 : enemy.kind === "bomber" ? 2.25 : 1.8) + Math.random() * 0.7;
         }
       });
       game.enemies = game.enemies.filter((enemy) => enemy.y < HEIGHT + 45);
@@ -784,6 +788,11 @@ export function useShooterGame() {
         setCombo(game.combo);
         emitExplosion(enemy.x, enemy.y, enemy.maxHp > 1 ? "#ffa86d" : "#ff729f");
         const dropRoll = Math.random();
+        const typeBuff: Partial<Record<Enemy["kind"], Drop["kind"]>> = { fast: "rapid", heavy: "shield", tracker: "bomb", sniper: "power", bomber: "spread", weaver: "weapon", suicide: "life" };
+        if (typeBuff[enemy.kind] && Math.random() < 0.72) {
+          const kind = typeBuff[enemy.kind]!;
+          game.drops.push({ x: enemy.x, y: enemy.y, radius: 12, speed: 54, phase: Math.random() * Math.PI * 2, kind });
+        }
         game.killsSinceSpreadDrop += 1;
         const guaranteedBuff = game.killsSinceSpreadDrop >= 4;
         if (dropRoll < 0.28 || guaranteedBuff) {
@@ -833,6 +842,10 @@ export function useShooterGame() {
           if (drop.kind === "spread") {
             game.spreadBuffTime = 10;
             setSpreadBuffTime(10);
+          } else if (drop.kind === "rapid") {
+            game.rapidFireTime = Math.min(18, game.rapidFireTime + 8);
+          } else if (drop.kind === "power") {
+            game.damageBuffTime = Math.min(18, game.damageBuffTime + 8);
           } else if (drop.kind === "bomb") {
             game.bombCount = Math.min(5, game.bombCount + 1); setBombCount(game.bombCount);
           } else if (drop.kind === "life") {
@@ -842,7 +855,7 @@ export function useShooterGame() {
           } else if (game.weaponLevel < 3) {
             game.weaponLevel += 1; setWeaponLevel(game.weaponLevel);
           } else { game.score += 250; }
-          const pickupColor = drop.kind === "spread" ? "#d795ff" : drop.kind === "bomb" ? "#ff9b62" : drop.kind === "life" ? "#ff6f9b" : drop.kind === "shield" ? "#63c9ff" : "#70f7d4";
+          const pickupColor = drop.kind === "spread" ? "#d795ff" : drop.kind === "bomb" ? "#ff9b62" : drop.kind === "life" ? "#ff6f9b" : drop.kind === "shield" ? "#63c9ff" : drop.kind === "rapid" ? "#ffe16b" : drop.kind === "power" ? "#ff6b9d" : "#70f7d4";
           emitExplosion(drop.x, drop.y, pickupColor, 10);
         }
       });
@@ -1144,7 +1157,7 @@ export function useShooterGame() {
         ctx.translate(drop.x, drop.y);
         ctx.rotate(game.elapsed * 1.4);
         const isSpread = drop.kind === "spread";
-        const powerColor = isSpread ? "#d795ff" : drop.kind === "bomb" ? "#ff9b62" : drop.kind === "life" ? "#ff6f9b" : drop.kind === "shield" ? "#63c9ff" : "#70f7d4";
+        const powerColor = isSpread ? "#d795ff" : drop.kind === "bomb" ? "#ff9b62" : drop.kind === "life" ? "#ff6f9b" : drop.kind === "shield" ? "#63c9ff" : drop.kind === "rapid" ? "#ffe16b" : drop.kind === "power" ? "#ff6b9d" : "#70f7d4";
         ctx.shadowColor = powerColor;
         ctx.shadowBlur = isSpread ? 28 : 18;
         if (isSpread) {
@@ -1173,9 +1186,12 @@ export function useShooterGame() {
         ctx.save();
         ctx.translate(enemy.x, enemy.y);
         ctx.rotate(Math.PI);
-        const enemyColors = enemy.kind === "fast" ? ["#f6d365", "#ffbd45"] : enemy.kind === "heavy" ? ["#ff9d69", "#ff794b"] : enemy.kind === "suicide" ? ["#ff526f", "#ff284e"] : enemy.kind === "tracker" ? ["#b18cff", "#8b5cff"] : ["#ff6f9b", "#fa4d93"];
-        drawShip(ctx, 0, 0, enemy.kind === "heavy" ? 1.22 : enemy.kind === "fast" ? 0.72 : 0.88, enemyColors[0], enemyColors[1]);
+        const enemyColors = enemy.kind === "fast" ? ["#f6d365", "#ffbd45"] : enemy.kind === "heavy" ? ["#ff9d69", "#ff794b"] : enemy.kind === "suicide" ? ["#ff526f", "#ff284e"] : enemy.kind === "tracker" ? ["#b18cff", "#8b5cff"] : enemy.kind === "sniper" ? ["#fff08a", "#ffc857"] : enemy.kind === "bomber" ? ["#ffad62", "#ff713d"] : enemy.kind === "weaver" ? ["#63f2d2", "#19bda8"] : ["#ff6f9b", "#fa4d93"];
+        const enemyScale = enemy.kind === "heavy" ? 1.22 : enemy.kind === "fast" || enemy.kind === "weaver" ? 0.72 : enemy.kind === "bomber" ? 1.05 : 0.88;
+        drawShip(ctx, 0, 0, enemyScale, enemyColors[0], enemyColors[1]);
         if (enemy.kind === "suicide") { ctx.strokeStyle = "#ff405f"; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(0, 0, enemy.radius + 5, 0, Math.PI * 2); ctx.stroke(); }
+        if (enemy.kind === "sniper") { ctx.strokeStyle = "#fff08a"; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(-15, 0); ctx.lineTo(15, 0); ctx.stroke(); }
+        if (enemy.kind === "bomber") { ctx.strokeStyle = "#ffad62"; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(0, 0, enemy.radius + 4, 0, Math.PI * 2); ctx.stroke(); }
         ctx.restore();
         if (enemy.maxHp > 1) {
           ctx.fillStyle = "rgba(6, 10, 28, 0.85)";
