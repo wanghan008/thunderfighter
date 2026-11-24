@@ -824,7 +824,7 @@ export function useShooterGame() {
           boss.phaseIndex = nextPhase;
           setBossPhase(nextPhase);
           emitExplosion(boss.x, boss.y, nextPhase === 3 ? "#fff18a" : "#ff9b75", 20);
-          boss.fireTimer = Math.min(boss.fireTimer, 0.25);
+          boss.attackTimer = Math.min(boss.attackTimer, 0.25);
         }
 
         // Telegraph attacks first, then activate them so players have time to dodge.
