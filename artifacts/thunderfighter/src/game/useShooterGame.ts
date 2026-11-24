@@ -523,7 +523,7 @@ export function useShooterGame() {
         maxHp: hp,
         speed: ((kind === "fast" ? 172 : kind === "suicide" ? 126 : kind === "weaver" ? 108 : kind === "sniper" ? 58 : kind === "bomber" ? 66 : heavy ? 48 : 84) + Math.min(elapsed * 0.35, 28)) * (1 + difficulty * 0.065),
         phase: Math.random() * Math.PI * 2,
-        fireTimer: ["tracker", "heavy", "sniper", "bomber"].includes(kind) ? Math.max(0.65, 1.8 - difficulty * 0.075) : 99,
+        fireTimer: kind === "tracker" || kind === "heavy" || kind === "sniper" || kind === "bomber" ? Math.max(0.65, 1.8 - difficulty * 0.075) : 99,
         kind,
       });
     };
@@ -708,7 +708,7 @@ export function useShooterGame() {
           enemy.x += Math.sin(game.elapsed * frequency + enemy.phase) * sway * dt;
         }
         enemy.fireTimer -= dt;
-        if (["tracker", "heavy", "sniper", "bomber"].includes(enemy.kind) && enemy.fireTimer <= 0 && enemy.y > 35 && enemy.y < HEIGHT * 0.75) {
+        if ((enemy.kind === "tracker" || enemy.kind === "heavy" || enemy.kind === "sniper" || enemy.kind === "bomber") && enemy.fireTimer <= 0 && enemy.y > 35 && enemy.y < HEIGHT * 0.75) {
           const dx = game.playerX - enemy.x;
           const dy = game.playerY - enemy.y;
           const length = Math.max(1, Math.hypot(dx, dy));
