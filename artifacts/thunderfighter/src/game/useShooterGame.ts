@@ -558,8 +558,8 @@ export function useShooterGame() {
     const spawnBoss = () => {
       const game = runtimeRef.current;
       const baseHp = (95 + game.stage * 42) * 5;
-      // 前两关降低首领血量：第1关为原来的十分之一，第2关为原来的三分之一。
-      const hp = baseHp * (game.stage === 1 ? 0.1 : game.stage === 2 ? 1 / 3 : 1);
+      // 在此前削弱基础上再次降低：第1关再减半（原始血量的1/20），第2关再降至1/3（原始血量的1/9）。
+      const hp = baseHp * (game.stage === 1 ? 0.05 : game.stage === 2 ? 1 / 9 : 1);
       const spawnSide = Math.random() < 0.5 ? "left" : "right";
       const anchorX = spawnSide === "left" ? 82 : WIDTH - 82;
       game.boss = {
@@ -645,7 +645,7 @@ export function useShooterGame() {
           vx: pattern.vx,
           vy: -470,
           radius: 3.5,
-          damage: (game.weaponType === "laser" ? 2 : 1) * (1 + game.damageLevel * 0.25) * (game.damageBuffTime > 0 ? 1.6 : 1),
+          damage: (game.weaponType === "laser" ? 2 : 1) * (game.weaponType === "homing" ? 2 / 3 : 1) * (1 + game.damageLevel * 0.25) * (game.damageBuffTime > 0 ? 1.6 : 1),
           color: game.weaponType === "laser" ? "#70f7ff" : game.weaponType === "homing" ? "#ff9b62" : game.weaponType === "spread" ? "#d795ff" : "#ffe08a",
           homing: game.weaponType === "homing",
           piercing: game.weaponType === "piercing",
