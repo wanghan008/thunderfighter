@@ -1,4 +1,4 @@
-import { useShooterGame } from './game/useShooterGame';
+import { useShooterGame, type UpgradeChoice, type WeaponType } from './game/useShooterGame';
 import { ArrowUpRight, Bomb, Crosshair, Pause, Play, RotateCcw, Shield, Zap } from 'lucide-react';
 
 type GameStatus = 'ready' | 'running' | 'paused' | 'gameover' | 'victory';
@@ -14,6 +14,8 @@ function Overlay({
   startGame,
   resumeGame,
   restartGame,
+  upgradeChoices,
+  chooseUpgrade,
 }: {
   status: GameStatus;
   score: number;
@@ -21,27 +23,34 @@ function Overlay({
   startGame: () => void;
   resumeGame: () => void;
   restartGame: () => void;
+  upgradeChoices: UpgradeChoice[];
+  chooseUpgrade: (id: UpgradeChoice['id']) => void;
 }) {
   if (status === 'running') return null;
 
   const isReady = status === 'ready';
   const isPaused = status === 'paused';
   const isVictory = status === 'victory';
+  const isUpgrade = status === 'upgrade';
   const title = isReady
     ? <>雷霆<span>出击</span></>
     : isPaused
       ? <>战斗<em>暂停</em></>
       : isVictory
         ? <>目标<em>歼灭</em></>
-        : <>战机<em>坠毁</em></>;
+        : isUpgrade
+          ? <>强化<em>整备</em></>
+          : <>战机<em>坠毁</em></>;
   const copy = isReady
     ? '敌方机群已进入近地轨道。立即升空，守住防线。'
     : isPaused
       ? '战场暂时冻结。准备好后，继续你的任务。'
       : isVictory
         ? '十关挑战全部完成！你已成为星际防线的王牌飞行员。'
-        : '本次出击结束。重新整备，再次进入战区。';
-  const stamp = isReady ? '十关挑战 · 战斗警报' : isPaused ? '任务暂停中' : isVictory ? '十关挑战 · 全部通关' : '任务失败';
+        : isUpgrade
+          ? '首领已被击败。选择一项永久强化，为下一关做好准备。'
+          : '本次出击结束。重新整备，再次进入战区。';
+  const stamp = isReady ? '十关挑战 · 战斗警报' : isPaused ? '任务暂停中' : isVictory ? '十关挑战 · 全部通关' : isUpgrade ? '关卡突破 · 永久强化' : '任务失败';
 
   return (
     <div className="canvas-overlay" data-testid="status-overlay">
@@ -56,7 +65,7 @@ function Overlay({
           </div>
         )}
         <div className="overlay-actions">
-          {isReady ? (
+          {isUpgrade ? null : isReady ? (
             <button className="primary-button" onClick={startGame} data-testid="button-start">
               <Play size={16} fill="currentColor" /> 开始出击
             </button>
@@ -75,6 +84,19 @@ function Overlay({
             </button>
           )}
         </div>
+        {isUpgrade && (
+          <div className="upgrade-options">
+            <h2 className="upgrade-title">选择战机强化</h2>
+            <p className="overlay-copy">强化效果在本次出击后续关卡中持续生效。</p>
+            {upgradeChoices.map((choice) => (
+              <button className="upgrade-card" key={choice.id} onClick={() => chooseUpgrade(choice.id)}>
+                <span className="upgrade-icon">{choice.icon}</span>
+                <span><strong>{choice.name}</strong><small>{choice.description}</small></span>
+                <ArrowUpRight size={16} />
+              </button>
+            ))}
+          </div>
+        )}
         {isReady && <div className="overlay-hint">点击「开始出击」进入战场</div>}
       </div>
     </div>
@@ -97,6 +119,10 @@ function App() {
     spreadBuffTime,
     combo,
     shieldCharges,
+    weaponType,
+    upgradeChoices,
+    chooseWeapon,
+    chooseUpgrade,
     startGame,
     pauseGame,
     resumeGame,
@@ -197,6 +223,8 @@ function App() {
             startGame={startGame}
             resumeGame={resumeGame}
             restartGame={restartGame}
+            upgradeChoices={upgradeChoices}
+            chooseUpgrade={chooseUpgrade}
           />
         </div>
 
@@ -222,7 +250,22 @@ function App() {
           <button className="rail-button" onClick={activateBomb} disabled={!isActive || bombCount <= 0} data-testid="button-activate-bomb">
             <span><Bomb size={15} style={{ verticalAlign: 'middle', marginRight: 8 }} />战术炸弹</span><span className="rail-value">{bombCount}×</span>
           </button>
-          <div className="rail-note">补给说明：紫色多排弹、绿色火力、橙色炸弹、红色生命、蓝色护盾（抵挡一次伤害）。连续击落敌机可累积连击倍率。</div>
+          <div className="weapon-panel">
+            <div className="panel-label">主武器选择 <span>战斗中可切换</span></div>
+            <div className="weapon-grid">
+              {([
+                ["laser", "激光炮", "高伤害直线射击"],
+                ["homing", "追踪导弹", "自动追踪目标"],
+                ["spread", "散射炮", "扇形覆盖弹幕"],
+                ["piercing", "穿透弹", "贯穿多个敌人"],
+              ] as [WeaponType, string, string][]).map(([id, name, desc]) => (
+                <button key={id} className={`weapon-choice${weaponType === id ? " selected" : ""}`} onClick={() => chooseWeapon(id)} disabled={!isActive} aria-pressed={weaponType === id}>
+                  <strong>{name}</strong><small>{desc}</small>
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="rail-note">敌机：黄色高速机、橙色重装机、红色自爆机、紫色追踪攻击机。补给可获得多排弹、炸弹、生命和护盾。</div>
         </aside>
       </section>
 
