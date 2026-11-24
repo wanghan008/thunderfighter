@@ -561,8 +561,8 @@ export function useShooterGame() {
     const spawnBoss = () => {
       const game = runtimeRef.current;
       const baseHp = (95 + game.stage * 42) * 5;
-      // 在此前削弱基础上再次降低：第1关再减半（原始血量的1/20），第2关再降至1/3（原始血量的1/9）。
-      const hp = baseHp * (game.stage === 1 ? 0.05 : game.stage === 2 ? 1 / 9 : 1);
+      // 第1关为原始血量的1/20，第2关为1/9，第3至10关统一降至原始血量的1/5。
+      const hp = baseHp * (game.stage === 1 ? 0.05 : game.stage === 2 ? 1 / 9 : 0.2);
       const spawnSide = Math.random() < 0.5 ? "left" : "right";
       const anchorX = spawnSide === "left" ? 82 : WIDTH - 82;
       game.boss = {
