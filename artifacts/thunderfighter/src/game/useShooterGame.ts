@@ -892,12 +892,11 @@ export function useShooterGame() {
         // Laser sweeps are one-time health milestones, not a repeating timer.
         const sweepMilestones = [0.7, 0.5, 0.3];
         for (const milestone of sweepMilestones) {
-          if (boss.hp / boss.maxHp <= milestone && !boss.sweepThresholdsFired.includes(milestone)) {
+          if (boss.hp / boss.maxHp <= milestone && !boss.sweepThresholdsFired.includes(milestone)
+            && boss.sweepWarning <= 0 && boss.sweepActive <= 0) {
             boss.sweepThresholdsFired.push(milestone);
-            if (boss.sweepWarning <= 0 && boss.sweepActive <= 0) {
-              boss.sweepWarning = 0.9;
-              boss.sweepX = boss.sweepDirection > 0 ? 24 : WIDTH - 24;
-            }
+            boss.sweepWarning = 0.9;
+            boss.sweepX = boss.sweepDirection > 0 ? 24 : WIDTH - 24;
             break;
           }
         }
