@@ -124,7 +124,7 @@ function createRuntime(): Runtime {
     score: 0,
     lives: 3,
     maxLives: 3,
-    weaponLevel: 1;
+    weaponLevel: 1,
     bombCount: 2,
     bombFlash: 0,
     spreadBuffTime: 0,
