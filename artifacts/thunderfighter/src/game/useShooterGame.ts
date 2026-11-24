@@ -1073,12 +1073,16 @@ export function useShooterGame() {
           ctx.moveTo(0,-36); ctx.lineTo(30,-10); ctx.lineTo(48,18); ctx.lineTo(0,28); ctx.lineTo(-48,18); ctx.lineTo(-30,-10);
         } else if (boss.stage === 2) {
           ctx.moveTo(-62,-12); ctx.lineTo(-28,-30); ctx.lineTo(-8,0); ctx.lineTo(0,-18); ctx.lineTo(8,0); ctx.lineTo(28,-30); ctx.lineTo(62,-12); ctx.lineTo(38,27); ctx.lineTo(-38,27);
-        } else if (boss.stage === 3 || boss.stage === 6) {
+        } else if (boss.stage === 3) {
           ctx.rect(-55,-26,110,52);
-        } else if (boss.stage === 4 || boss.stage === 7) {
-          ctx.moveTo(-72,-8); ctx.lineTo(-20,-24); ctx.lineTo(0,-12); ctx.lineTo(20,-24); ctx.lineTo(72,-8); ctx.lineTo(48,20); ctx.lineTo(0,30); ctx.lineTo(-48,20);
+        } else if (boss.stage === 4) {
+          ctx.moveTo(0,-42); ctx.lineTo(25,-4); ctx.lineTo(75,10); ctx.lineTo(30,24); ctx.lineTo(0,34); ctx.lineTo(-30,24); ctx.lineTo(-75,10); ctx.lineTo(-25,-4);
         } else if (boss.stage === 5) {
           for (let i=0;i<12;i++) { const ang=i*Math.PI/6; const x=Math.cos(ang)*48; const y=Math.sin(ang)*29; if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y); } ctx.closePath();
+        } else if (boss.stage === 6) {
+          ctx.moveTo(-60,-24);ctx.lineTo(-20,-38);ctx.lineTo(-8,-14);ctx.lineTo(8,-14);ctx.lineTo(20,-38);ctx.lineTo(60,-24);ctx.lineTo(48,28);ctx.lineTo(-48,28);
+        } else if (boss.stage === 7) {
+          ctx.moveTo(-78,-6);ctx.lineTo(-30,-32);ctx.lineTo(-6,-12);ctx.lineTo(0,20);ctx.lineTo(6,-12);ctx.lineTo(30,-32);ctx.lineTo(78,-6);ctx.lineTo(48,28);ctx.lineTo(0,12);ctx.lineTo(-48,28);
         } else if (boss.stage === 8) {
           ctx.ellipse(0,0,53,31,boss.phase*0.2,0,Math.PI*2);
         } else if (boss.stage === 9) {
