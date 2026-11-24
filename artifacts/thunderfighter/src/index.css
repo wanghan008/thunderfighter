@@ -582,3 +582,7 @@ kbd {
 }
 .combo-indicator strong { font: 800 15px var(--app-font-mono); letter-spacing: .08em; }
 .combo-indicator span { color: #9db2b8; font: 8px var(--app-font-mono); }
+
+
+/* Shield pickup HUD */
+.shield-count { margin-left: 6px; color: #7bd8ff; font: 9px var(--app-font-mono); text-shadow: 0 0 8px rgba(99, 201, 255, .45); }
