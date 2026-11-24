@@ -59,7 +59,6 @@ type Boss = {
   name: string;
   phase: number;
   phaseIndex: number;
-  fireTimer: number;
   attackTimer: number;
   laserWarning: number;
   laserActive: number;
@@ -517,7 +516,7 @@ export function useShooterGame() {
         x: WIDTH / 2, y: -100, hp, maxHp: hp, stage: game.stage,
         name: BOSS_NAMES[game.stage - 1] ?? "未知首领",
         phase: 0, phaseIndex: 1,
-        fireTimer: 1.5, attackTimer: 1.1,
+        attackTimer: 1.1,
         laserWarning: 0, laserActive: 0, laserXs: [], laserWidth: game.stage >= 9 ? 17 : 12,
         aoeWarning: 0, aoeActive: 0, aoeX: WIDTH / 2, aoeY: HEIGHT * 0.72,
         aoeRadius: game.stage >= 8 ? 76 : 54, aoeHit: false,
@@ -910,12 +909,6 @@ export function useShooterGame() {
           }
         }
 
-        // Early bosses use straightforward volleys; later bosses combine multiple attack layers.
-        boss.fireTimer -= dt;
-        if (boss.fireTimer <= 0 && boss.y >= 90 && stage <= 3) {
-          aimed(stage === 1 ? 1 : stage === 2 ? 2 : 3, 0.38);
-          boss.fireTimer = Math.max(0.75, 1.65 - stage * 0.2 - (boss.phaseIndex - 1) * 0.2);
-        }
         game.shots.forEach((shot) => {
           if (circleHit(shot.x, shot.y, shot.radius, boss.x, boss.y, 46) && !shot.hitBoss) {
             if (!shot.piercing) shot.y = -40;
