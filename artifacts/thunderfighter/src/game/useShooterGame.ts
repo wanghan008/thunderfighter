@@ -648,7 +648,7 @@ export function useShooterGame() {
           vx: pattern.vx,
           vy: -470,
           radius: 3.5,
-          damage: (game.weaponType === "laser" ? 2 : 1) * (game.weaponType === "homing" ? 2 / 3 : 1) * (1 + game.damageLevel * 0.25) * (game.damageBuffTime > 0 ? 1.6 : 1),
+          damage: (game.weaponType === "laser" ? 8 / 3 : 1) * (game.weaponType === "homing" ? 2 / 3 : 1) * (1 + game.damageLevel * 0.25) * (game.damageBuffTime > 0 ? 1.6 : 1),
           color: game.weaponType === "laser" ? "#70f7ff" : game.weaponType === "homing" ? "#ff9b62" : game.weaponType === "spread" ? "#d795ff" : "#ffe08a",
           homing: game.weaponType === "homing",
           piercing: game.weaponType === "piercing",
