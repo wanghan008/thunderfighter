@@ -540,7 +540,7 @@ export function useShooterGame() {
             { offset: 14, vx: 18 },
             { offset: 28, vx: 34 },
           ]
-        : game.weaponType === "laser" || game.weaponType === "homing" || game.weaponType === "piercing"
+        : game.weaponLevel === 1
           ? [{ offset: 0, vx: 0 }]
           : game.weaponLevel === 2
             ? [
