@@ -557,7 +557,9 @@ export function useShooterGame() {
     ];
     const spawnBoss = () => {
       const game = runtimeRef.current;
-      const hp = (95 + game.stage * 42) * 5;
+      const baseHp = (95 + game.stage * 42) * 5;
+      // 前两关降低首领血量：第1关为原来的十分之一，第2关为原来的三分之一。
+      const hp = baseHp * (game.stage === 1 ? 0.1 : game.stage === 2 ? 1 / 3 : 1);
       const spawnSide = Math.random() < 0.5 ? "left" : "right";
       const anchorX = spawnSide === "left" ? 82 : WIDTH - 82;
       game.boss = {
