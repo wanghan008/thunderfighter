@@ -606,3 +606,5 @@ kbd {
 .upgrade-card small { color: #91a5ac; font-size: 10px; line-height: 1.4; }
 .upgrade-icon { display: grid; width: 32px; height: 32px; place-items: center; border: 1px solid rgba(245,199,68,.4); color: #f5c744; font-size: 18px; }
 @media (max-width: 650px) { .weapon-panel { padding: 10px; } .weapon-choice { min-height: 48px; padding: 6px; } }
+
+@media (max-width: 900px) { .weapon-panel { grid-column: 1 / -1; } }
