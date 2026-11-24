@@ -846,6 +846,7 @@ export function useShooterGame() {
         // A dedicated front-facing laser sweep fires on a strict three-second cycle.
         boss.sweepTimer -= dt;
         if (boss.sweepTimer <= 0 && boss.sweepWarning <= 0 && boss.sweepActive <= 0) {
+          boss.sweepTimer = 3;
           boss.sweepWarning = 0.72;
           boss.sweepX = boss.sweepDirection > 0 ? 24 : WIDTH - 24;
         }
@@ -857,7 +858,7 @@ export function useShooterGame() {
           boss.sweepActive = Math.max(0, boss.sweepActive - dt);
           boss.sweepX += boss.sweepDirection * 330 * dt;
           if (Math.abs(game.playerX - boss.sweepX) < 15 + PLAYER_RADIUS * 0.55 && game.playerY > boss.y + 24) damagePlayer();
-          if (boss.sweepActive === 0) { boss.sweepTimer = 3; boss.sweepDirection *= -1; }
+          if (boss.sweepActive === 0) boss.sweepDirection *= -1;
         }
         boss.shieldCooldown -= dt;
         if (boss.shieldCooldown <= 0 && boss.invulnerable <= 0) {
