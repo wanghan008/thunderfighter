@@ -115,6 +115,8 @@ function App() {
     weaponLevel,
     bossHealth,
     bossMaxHealth,
+    bossName,
+    bossPhase,
     bombCount,
     spreadBuffTime,
     combo,
@@ -194,7 +196,7 @@ function App() {
           )}
           {showBoss && (
             <div className="boss-health" data-testid="boss-health">
-              <div className="boss-caption"><span>第 {stage} 关 · 关底首领</span><span>{Math.round(bossPercent)}%</span></div>
+              <div className="boss-caption"><span>第 {stage} 关 · {bossName || "关底首领"} <em className="boss-phase-label">阶段 {bossPhase}/3</em></span><span>{Math.round(bossPercent)}%</span></div>
               <div className="boss-track"><div className="boss-fill" style={{ width: `${bossPercent}%` }} /></div>
             </div>
           )}
