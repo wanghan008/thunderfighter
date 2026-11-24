@@ -27,7 +27,7 @@ type Enemy = {
   speed: number;
   phase: number;
   fireTimer: number;
-  kind: "basic" | "fast" | "heavy" | "suicide" | "tracker" | "sniper" | "bomber" | "weaver";
+  kind: "basic" | "fast" | "heavy" | "suicide" | "tracker" | "sniper" | "bomber" | "weaver" | "gunship";
 };
 
 type Drop = {
@@ -108,6 +108,7 @@ type Runtime = {
   playerInvulnerable: number;
   fireTimer: number;
   enemySpawnTimer: number;
+  formationTimer: number;
   shots: Shot[];
   enemyShots: Shot[];
   enemies: Enemy[];
@@ -148,7 +149,8 @@ function createRuntime(): Runtime {
     playerY: HEIGHT * 0.82,
     playerInvulnerable: 0,
     fireTimer: 0,
-    enemySpawnTimer: 0.7,
+    enemySpawnTimer: 0.55,
+    formationTimer: 4.2,
     shots: [],
     enemyShots: [],
     enemies: [],
@@ -506,26 +508,47 @@ export function useShooterGame() {
       }
     };
 
-    const createEnemy = (elapsed: number) => {
+    const createEnemy = (elapsed: number, forcedKind?: Enemy["kind"], spawnX?: number, spawnY = -30) => {
       const game = runtimeRef.current;
       const difficulty = game.stage;
       const roll = Math.random();
-      const kind: Enemy["kind"] = roll < 0.16 ? "fast" : roll < 0.27 ? "heavy" : roll < 0.38 ? "suicide" : roll < 0.51 ? "tracker" : roll < 0.63 ? "sniper" : roll < 0.76 ? "bomber" : roll < 0.88 ? "weaver" : "basic";
+      const kind: Enemy["kind"] = forcedKind ?? (roll < 0.19 ? "fast" : roll < 0.31 ? "heavy" : roll < 0.42 ? "suicide" : roll < 0.54 ? "tracker" : roll < 0.66 ? "sniper" : roll < 0.78 ? "bomber" : roll < 0.9 ? "weaver" : roll < 0.96 ? "gunship" : "basic");
       const heavy = kind === "heavy";
-      const radius = heavy ? 19 : kind === "fast" || kind === "suicide" || kind === "weaver" ? 11 : kind === "bomber" ? 16 : 13;
-      const normalHp = difficulty >= 7 ? 2 : 1;
-      const hp = heavy ? 4 + Math.floor(difficulty / 3) : kind === "tracker" || kind === "sniper" || kind === "bomber" ? 2 : normalHp;
+      const radius = heavy ? 19 : kind === "fast" || kind === "suicide" || kind === "weaver" ? 11 : kind === "bomber" || kind === "gunship" ? 17 : 13;
+      const normalHp = difficulty >= 7 ? 3 : difficulty >= 4 ? 2 : 1;
+      const hp = heavy ? 4 + Math.floor(difficulty / 2) : kind === "tracker" || kind === "sniper" || kind === "bomber" ? 2 + Math.floor(difficulty / 5) : kind === "gunship" ? 3 + Math.floor(difficulty / 4) : normalHp;
+      const baseSpeed = kind === "fast" ? 184 : kind === "suicide" ? 138 : kind === "weaver" ? 116 : kind === "sniper" ? 62 : kind === "bomber" || kind === "gunship" ? 72 : heavy ? 52 : 92;
       game.enemies.push({
-        x: radius + Math.random() * (WIDTH - radius * 2),
-        y: -30,
+        x: spawnX ?? (radius + Math.random() * (WIDTH - radius * 2)),
+        y: spawnY,
         radius,
         hp,
         maxHp: hp,
-        speed: ((kind === "fast" ? 172 : kind === "suicide" ? 126 : kind === "weaver" ? 108 : kind === "sniper" ? 58 : kind === "bomber" ? 66 : heavy ? 48 : 84) + Math.min(elapsed * 0.35, 28)) * (1 + difficulty * 0.065),
+        speed: (baseSpeed + Math.min(elapsed * 0.4, 34)) * (1 + difficulty * 0.07),
         phase: Math.random() * Math.PI * 2,
-        fireTimer: kind === "tracker" || kind === "heavy" || kind === "sniper" || kind === "bomber" ? Math.max(0.65, 1.8 - difficulty * 0.075) : 99,
+        fireTimer: kind === "tracker" || kind === "heavy" || kind === "sniper" || kind === "bomber" || kind === "gunship" ? Math.max(0.55, 1.65 - difficulty * 0.07) : 99,
         kind,
       });
+    };
+
+    const spawnEnemyFormation = (elapsed: number, availableSlots: number) => {
+      const game = runtimeRef.current;
+      const count = Math.min(availableSlots, Math.min(3 + Math.floor(game.stage / 3), 6));
+      if (count < 3) return;
+      const centerX = 58 + Math.random() * (WIDTH - 116);
+      const formationRoll = Math.random();
+      const formationKinds: Enemy["kind"][] = ["fast", "weaver", "bomber", "gunship", "tracker"];
+      for (let i = 0; i < count; i += 1) {
+        const centered = i - (count - 1) / 2;
+        const xOffset = formationRoll < 0.42
+          ? centered * 48
+          : formationRoll < 0.78
+            ? Math.abs(centered) * 48 * (centered < 0 ? -1 : 1)
+            : centered * 42;
+        const yOffset = formationRoll < 0.42 ? 0 : formationRoll < 0.78 ? Math.abs(centered) * 18 : (i % 2) * 24;
+        const kind = formationKinds[(Math.floor(Math.random() * formationKinds.length) + Math.floor(game.stage / 2)) % formationKinds.length];
+        createEnemy(elapsed, kind, Math.max(28, Math.min(WIDTH - 28, centerX + xOffset)), -32 - yOffset);
+      }
     };
 
     const BOSS_NAMES = [
@@ -671,10 +694,19 @@ export function useShooterGame() {
       }
 
       game.enemySpawnTimer -= dt;
-      const enemyLimit = Math.min(7 + Math.floor(game.stage * 0.65), 14);
-      if (!game.boss && game.enemySpawnTimer <= 0 && game.enemies.length < enemyLimit) {
-        createEnemy(game.stageElapsed);
-        game.enemySpawnTimer = Math.max(0.34, 1.18 - game.stage * 0.065);
+      game.formationTimer -= dt;
+      const enemyLimit = Math.min(9 + Math.floor(game.stage * 0.9), 18);
+      if (!game.boss && game.enemies.length < enemyLimit) {
+        if (game.formationTimer <= 0 && game.enemies.length <= enemyLimit - 3) {
+          // 编队定期从屏幕上方整体进入，队形在进入战场前保持紧凑。
+          spawnEnemyFormation(game.stageElapsed, enemyLimit - game.enemies.length);
+          game.formationTimer = Math.max(3.2, 6.2 - game.stage * 0.28) + Math.random() * 1.4;
+          game.enemySpawnTimer = Math.min(game.enemySpawnTimer, 0.35);
+        }
+        if (game.enemySpawnTimer <= 0 && game.enemies.length < enemyLimit) {
+          createEnemy(game.stageElapsed);
+          game.enemySpawnTimer = Math.max(0.25, 0.92 - game.stage * 0.055);
+        }
       }
 
       game.shots.forEach((shot) => {
@@ -708,17 +740,27 @@ export function useShooterGame() {
           enemy.x += Math.sin(game.elapsed * frequency + enemy.phase) * sway * dt;
         }
         enemy.fireTimer -= dt;
-        if ((enemy.kind === "tracker" || enemy.kind === "heavy" || enemy.kind === "sniper" || enemy.kind === "bomber") && enemy.fireTimer <= 0 && enemy.y > 35 && enemy.y < HEIGHT * 0.75) {
+        if ((enemy.kind === "tracker" || enemy.kind === "heavy" || enemy.kind === "sniper" || enemy.kind === "bomber" || enemy.kind === "gunship") && enemy.fireTimer <= 0 && enemy.y > 35 && enemy.y < HEIGHT * 0.75) {
           const dx = game.playerX - enemy.x;
           const dy = game.playerY - enemy.y;
           const length = Math.max(1, Math.hypot(dx, dy));
-          const speed = (enemy.kind === "sniper" ? 190 : enemy.kind === "bomber" ? 112 : 95) + game.stage * 10;
+          const speed = (enemy.kind === "sniper" ? 205 : enemy.kind === "bomber" || enemy.kind === "gunship" ? 126 : 102) + game.stage * 10;
           const fireOne = (angle: number, color = "#ff728e") => game.enemyShots.push({ x: enemy.x, y: enemy.y + enemy.radius, vx: Math.sin(angle) * speed, vy: Math.cos(angle) * speed, radius: enemy.kind === "sniper" ? 4.4 : 3.6, damage: 1, color });
+          const fireFlatRow = (count: number, spread: number, color: string) => {
+            for (let i = 0; i < count; i += 1) {
+              const vx = (i - (count - 1) / 2) * spread;
+              game.enemyShots.push({ x: enemy.x, y: enemy.y + enemy.radius, vx, vy: speed, radius: enemy.kind === "gunship" ? 4 : 3.7, damage: 1, color });
+            }
+          };
           const aim = Math.atan2(dx, dy);
           if (enemy.kind === "bomber") {
-            for (let i = -1; i <= 1; i += 1) fireOne(aim + i * 0.28, "#ffad62");
+            // 轰炸机发射三发平行横排弹，覆盖更宽区域。
+            fireFlatRow(3, 92, "#ffad62");
+          } else if (enemy.kind === "gunship") {
+            // 重型炮艇发射五发平行横排弹。
+            fireFlatRow(5, 72, "#ff6f86");
           } else fireOne(aim, enemy.kind === "sniper" ? "#ffdf72" : "#ff728e");
-          enemy.fireTimer = (enemy.kind === "heavy" ? 2.5 : enemy.kind === "sniper" ? 2.8 : enemy.kind === "bomber" ? 2.25 : 1.8) + Math.random() * 0.7;
+          enemy.fireTimer = (enemy.kind === "heavy" ? 2.5 : enemy.kind === "sniper" ? 2.8 : enemy.kind === "bomber" ? 2.15 : enemy.kind === "gunship" ? 2.45 : 1.8) + Math.random() * 0.65;
         }
       });
       game.enemies = game.enemies.filter((enemy) => enemy.y < HEIGHT + 45);
@@ -1186,12 +1228,13 @@ export function useShooterGame() {
         ctx.save();
         ctx.translate(enemy.x, enemy.y);
         ctx.rotate(Math.PI);
-        const enemyColors = enemy.kind === "fast" ? ["#f6d365", "#ffbd45"] : enemy.kind === "heavy" ? ["#ff9d69", "#ff794b"] : enemy.kind === "suicide" ? ["#ff526f", "#ff284e"] : enemy.kind === "tracker" ? ["#b18cff", "#8b5cff"] : enemy.kind === "sniper" ? ["#fff08a", "#ffc857"] : enemy.kind === "bomber" ? ["#ffad62", "#ff713d"] : enemy.kind === "weaver" ? ["#63f2d2", "#19bda8"] : ["#ff6f9b", "#fa4d93"];
-        const enemyScale = enemy.kind === "heavy" ? 1.22 : enemy.kind === "fast" || enemy.kind === "weaver" ? 0.72 : enemy.kind === "bomber" ? 1.05 : 0.88;
+        const enemyColors = enemy.kind === "fast" ? ["#f6d365", "#ffbd45"] : enemy.kind === "heavy" ? ["#ff9d69", "#ff794b"] : enemy.kind === "suicide" ? ["#ff526f", "#ff284e"] : enemy.kind === "tracker" ? ["#b18cff", "#8b5cff"] : enemy.kind === "sniper" ? ["#fff08a", "#ffc857"] : enemy.kind === "bomber" ? ["#ffad62", "#ff713d"] : enemy.kind === "weaver" ? ["#63f2d2", "#19bda8"] : enemy.kind === "gunship" ? ["#ff6f86", "#d92f63"] : ["#ff6f9b", "#fa4d93"];
+        const enemyScale = enemy.kind === "heavy" || enemy.kind === "gunship" ? 1.22 : enemy.kind === "fast" || enemy.kind === "weaver" ? 0.72 : enemy.kind === "bomber" ? 1.05 : 0.88;
         drawShip(ctx, 0, 0, enemyScale, enemyColors[0], enemyColors[1]);
         if (enemy.kind === "suicide") { ctx.strokeStyle = "#ff405f"; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(0, 0, enemy.radius + 5, 0, Math.PI * 2); ctx.stroke(); }
         if (enemy.kind === "sniper") { ctx.strokeStyle = "#fff08a"; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(-15, 0); ctx.lineTo(15, 0); ctx.stroke(); }
         if (enemy.kind === "bomber") { ctx.strokeStyle = "#ffad62"; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(0, 0, enemy.radius + 4, 0, Math.PI * 2); ctx.stroke(); }
+        if (enemy.kind === "gunship") { ctx.strokeStyle = "#ff6f86"; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(-20, 4); ctx.lineTo(20, 4); ctx.stroke(); }
         ctx.restore();
         if (enemy.maxHp > 1) {
           ctx.fillStyle = "rgba(6, 10, 28, 0.85)";
