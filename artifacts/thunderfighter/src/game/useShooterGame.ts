@@ -74,6 +74,7 @@ type Boss = {
   anchorX: number;
   spawnSide: "left" | "right";
   sweepTimer: number;
+  sweepThresholdsFired: number[];
   sweepWarning: number;
   sweepActive: number;
   sweepX: number;
@@ -87,6 +88,8 @@ type Boss = {
   invulnerable: number;
   shieldCounterPending: boolean;
   shieldCooldown: number;
+  hitFlash: number;
+  shieldBreakFlash: number;
 };
 
 type LeaderboardEntry = {
@@ -540,12 +543,13 @@ export function useShooterGame() {
         aoeRadius: game.stage >= 8 ? 76 : 54, aoeHit: false,
         spiralAngle: 0,
         anchorX, spawnSide,
-        sweepTimer: 3, sweepWarning: 0, sweepActive: 0,
+        sweepTimer: 0, sweepThresholdsFired: [], sweepWarning: 0, sweepActive: 0,
         sweepX: spawnSide === "left" ? 24 : WIDTH - 24,
         sweepDirection: spawnSide === "left" ? 1 : -1,
         sweepGapOffset: 0,
         chargeWarning: 0, chargeActive: 0, chargeVx: 0, chargeVy: 0, chargeHit: false,
         invulnerable: 0, shieldCooldown: 6 + Math.random() * 3, shieldCounterPending: false,
+        hitFlash: 0, shieldBreakFlash: 0,
       };
       game.bossSpawned = true;
       setBossName(game.boss.name);
@@ -848,6 +852,8 @@ export function useShooterGame() {
         const boss = game.boss;
         const stage = boss.stage;
         boss.phase += dt;
+        boss.hitFlash = Math.max(0, boss.hitFlash - dt);
+        boss.shieldBreakFlash = Math.max(0, boss.shieldBreakFlash - dt);
         if (boss.chargeWarning > 0) {
           boss.chargeWarning = Math.max(0, boss.chargeWarning - dt);
           if (boss.chargeWarning === 0) {
@@ -883,12 +889,17 @@ export function useShooterGame() {
           boss.attackTimer = Math.min(boss.attackTimer, 0.25);
         }
 
-        // A dedicated front-facing laser sweep fires on a strict three-second cycle.
-        boss.sweepTimer -= dt;
-        if (boss.sweepTimer <= 0 && boss.sweepWarning <= 0 && boss.sweepActive <= 0) {
-          boss.sweepTimer = 3;
-          boss.sweepWarning = 0.72;
-          boss.sweepX = boss.sweepDirection > 0 ? 24 : WIDTH - 24;
+        // Laser sweeps are one-time health milestones, not a repeating timer.
+        const sweepMilestones = [0.7, 0.5, 0.3];
+        for (const milestone of sweepMilestones) {
+          if (boss.hp / boss.maxHp <= milestone && !boss.sweepThresholdsFired.includes(milestone)) {
+            boss.sweepThresholdsFired.push(milestone);
+            if (boss.sweepWarning <= 0 && boss.sweepActive <= 0) {
+              boss.sweepWarning = 0.9;
+              boss.sweepX = boss.sweepDirection > 0 ? 24 : WIDTH - 24;
+            }
+            break;
+          }
         }
         if (boss.sweepWarning > 0) {
           boss.sweepWarning = Math.max(0, boss.sweepWarning - dt);
@@ -915,6 +926,8 @@ export function useShooterGame() {
           const wasShielded = boss.invulnerable > 0;
           boss.invulnerable = Math.max(0, boss.invulnerable - dt);
           if (wasShielded && boss.invulnerable === 0 && boss.shieldCounterPending) {
+            boss.shieldBreakFlash = 0.7;
+            emitExplosion(boss.x, boss.y, "#8be7ff", 28);
             const count = stage === 10 ? 9 : 5;
             const base = Math.atan2(game.playerX - boss.x, game.playerY - boss.y);
             for (let i = 0; i < count; i += 1) {
@@ -1050,7 +1063,11 @@ export function useShooterGame() {
           if (circleHit(shot.x, shot.y, shot.radius, boss.x, boss.y, 46) && !shot.hitBoss) {
             if (!shot.piercing) shot.y = -40;
             else shot.hitBoss = true;
-            if (boss.invulnerable <= 0) boss.hp -= shot.damage;
+            if (boss.invulnerable <= 0) {
+              boss.hp -= shot.damage;
+              boss.hitFlash = 0.12;
+              if (Math.random() < 0.28) emitExplosion(shot.x, shot.y, "#fff0b0", 3);
+            }
           }
         });
         if (boss.hp <= 0) {
@@ -1182,6 +1199,12 @@ export function useShooterGame() {
 
       game.enemyShots.forEach((shot) => {
         ctx.save();
+        if (shot.homing) {
+          const speed = Math.max(1, Math.hypot(shot.vx, shot.vy));
+          ctx.globalAlpha = 0.68; ctx.strokeStyle = shot.color; ctx.lineWidth = shot.radius * 1.15; ctx.shadowColor = shot.color; ctx.shadowBlur = 12;
+          ctx.beginPath(); ctx.moveTo(shot.x, shot.y); ctx.lineTo(shot.x - shot.vx / speed * 22, shot.y - shot.vy / speed * 22); ctx.stroke();
+          ctx.globalAlpha = 1;
+        }
         ctx.shadowColor = shot.color;
         ctx.shadowBlur = 13;
         ctx.fillStyle = shot.color;
@@ -1203,8 +1226,11 @@ export function useShooterGame() {
         const [body, edge, core] = palettes[boss.stage - 1] ?? palettes[9];
         ctx.save();
         ctx.translate(boss.x, boss.y);
-        ctx.shadowColor = edge; ctx.shadowBlur = 25;
-        ctx.fillStyle = body; ctx.strokeStyle = edge; ctx.lineWidth = 2.5;
+        const phaseThree = boss.phaseIndex === 3;
+        const visualEdge = boss.hitFlash > 0 ? "#ffffff" : phaseThree ? "#fff078" : edge;
+        ctx.shadowColor = visualEdge; ctx.shadowBlur = phaseThree ? 38 : boss.hitFlash > 0 ? 34 : 25;
+        ctx.fillStyle = boss.hitFlash > 0 ? "#fff4df" : phaseThree ? body : body;
+        ctx.strokeStyle = visualEdge; ctx.lineWidth = phaseThree ? 4 : 2.5;
         ctx.beginPath();
         if (boss.stage === 1) {
           ctx.moveTo(0,-36); ctx.lineTo(30,-10); ctx.lineTo(48,18); ctx.lineTo(0,28); ctx.lineTo(-48,18); ctx.lineTo(-30,-10);
@@ -1235,10 +1261,19 @@ export function useShooterGame() {
           ctx.fillStyle=edge; for (const side of [-1,1]) { ctx.beginPath();ctx.arc(side*42,8,8,0,Math.PI*2);ctx.fill(); }
         }
         if (boss.stage === 8 || boss.stage === 10) {
-          ctx.strokeStyle=edge;ctx.lineWidth=3;ctx.beginPath();ctx.ellipse(0,0,72,42,boss.phase*0.5,0,Math.PI*2);ctx.stroke();
+          ctx.strokeStyle=visualEdge;ctx.lineWidth=3;ctx.beginPath();ctx.ellipse(0,0,72,42,boss.phase*0.5,0,Math.PI*2);ctx.stroke();
+        }
+        if (phaseThree) {
+          ctx.save(); ctx.rotate(boss.phase * 0.16); ctx.strokeStyle = "#fff078"; ctx.lineWidth = 3; ctx.shadowColor = "#ff6b8e"; ctx.shadowBlur = 20;
+          for (let i = 0; i < 8; i += 1) { const angle = i * Math.PI / 4; ctx.beginPath(); ctx.moveTo(Math.cos(angle) * 48, Math.sin(angle) * 30); ctx.lineTo(Math.cos(angle) * 78, Math.sin(angle) * 52); ctx.stroke(); }
+          ctx.restore();
         }
         ctx.restore();
 
+        if (boss.shieldBreakFlash > 0) {
+          ctx.save(); ctx.globalAlpha = boss.shieldBreakFlash / 0.7; ctx.strokeStyle = "#b8f4ff"; ctx.lineWidth = 5; ctx.shadowColor = "#55cfff"; ctx.shadowBlur = 30;
+          ctx.beginPath(); ctx.arc(boss.x, boss.y, 82 + (0.7 - boss.shieldBreakFlash) * 42, 0, Math.PI * 2); ctx.stroke(); ctx.restore();
+        }
         if (boss.invulnerable > 0) {
           ctx.save();
           ctx.globalAlpha = 0.42 + Math.sin(boss.phase * 24) * 0.12;
@@ -1254,7 +1289,10 @@ export function useShooterGame() {
         if (boss.chargeWarning > 0 || boss.chargeActive > 0) {
           ctx.save();
           const charging = boss.chargeActive > 0;
-          ctx.globalAlpha = charging ? 0.72 : 0.3 + Math.sin(boss.phase * 20) * 0.12;
+          const chargePulse = 0.5 + Math.sin(boss.phase * 34) * 0.5;
+          ctx.globalAlpha = charging ? 0.82 : 0.24 + chargePulse * 0.28;
+          ctx.fillStyle = charging ? "rgba(255,65,90,0.22)" : `rgba(255,190,110,${0.08 + chargePulse * 0.12})`;
+          ctx.beginPath(); ctx.ellipse(boss.x, boss.y, 58 + chargePulse * 15, 38 + chargePulse * 10, 0, 0, Math.PI * 2); ctx.fill();
           ctx.strokeStyle = charging ? "#ff4d68" : "#ffd08a";
           ctx.lineWidth = charging ? 4 : 2;
           ctx.setLineDash(charging ? [] : [8, 7]);
