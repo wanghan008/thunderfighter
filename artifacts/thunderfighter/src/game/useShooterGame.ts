@@ -14,6 +14,8 @@ type Shot = {
   color: string;
   piercing?: boolean;
   homing?: boolean;
+  hitEnemies?: Enemy[];
+  hitBoss?: boolean;
 };
 
 type Enemy = {
@@ -82,6 +84,7 @@ type Runtime = {
   bossSpawned: boolean;
   score: number;
   lives: number;
+  maxLives: number;
   weaponLevel: number;
   bombCount: number;
   bombFlash: number;
@@ -120,7 +123,8 @@ function createRuntime(): Runtime {
     bossSpawned: false,
     score: 0,
     lives: 3,
-    weaponLevel: 1,
+    maxLives: 3,
+    weaponLevel: 1;
     bombCount: 2,
     bombFlash: 0,
     spreadBuffTime: 0,
@@ -371,7 +375,7 @@ export function useShooterGame() {
     if (statusRef.current !== "upgrade") return;
     if (id === "damage") game.damageLevel += 1;
     if (id === "rate") game.fireRateLevel += 1;
-    if (id === "armor") { game.lives = Math.min(5, game.lives + 1); setLives(game.lives); }
+    if (id === "armor") { game.maxLives = Math.min(5, game.maxLives + 1); game.lives = Math.min(game.maxLives, game.lives + 1); setLives(game.lives); }
     if (id === "mobility") game.mobilityLevel += 1;
     setUpgradeChoices([]);
     updateStatus("running");
@@ -559,6 +563,7 @@ export function useShooterGame() {
           color: game.weaponType === "laser" ? "#70f7ff" : game.weaponType === "homing" ? "#ff9b62" : game.weaponType === "spread" ? "#d795ff" : "#ffe08a",
           homing: game.weaponType === "homing",
           piercing: game.weaponType === "piercing",
+          hitEnemies: game.weaponType === "piercing" ? [] : undefined,
         });
       });
     };
@@ -683,8 +688,9 @@ export function useShooterGame() {
 
       game.enemies.forEach((enemy) => {
         game.shots.forEach((shot) => {
-          if (circleHit(shot.x, shot.y, shot.radius, enemy.x, enemy.y, enemy.radius)) {
+          if (circleHit(shot.x, shot.y, shot.radius, enemy.x, enemy.y, enemy.radius) && !shot.hitEnemies?.includes(enemy)) {
             if (!shot.piercing) shot.y = -40;
+            else shot.hitEnemies?.push(enemy);
             enemy.hp -= shot.damage;
           }
         });
@@ -764,7 +770,7 @@ export function useShooterGame() {
           } else if (drop.kind === "bomb") {
             game.bombCount = Math.min(5, game.bombCount + 1); setBombCount(game.bombCount);
           } else if (drop.kind === "life") {
-            game.lives = Math.min(5, game.lives + 1); setLives(game.lives);
+            game.lives = Math.min(game.maxLives, game.lives + 1); setLives(game.lives);
           } else if (drop.kind === "shield") {
             game.shieldCharges = Math.min(2, game.shieldCharges + 1); setShieldCharges(game.shieldCharges);
           } else if (game.weaponLevel < 3) {
@@ -802,8 +808,9 @@ export function useShooterGame() {
           boss.fireTimer = Math.max(0.5, 1.55 - game.stage * 0.085);
         }
         game.shots.forEach((shot) => {
-          if (circleHit(shot.x, shot.y, shot.radius, boss.x, boss.y, 44)) {
+          if (circleHit(shot.x, shot.y, shot.radius, boss.x, boss.y, 44) && !shot.hitBoss) {
             if (!shot.piercing) shot.y = -40;
+            else shot.hitBoss = true;
             boss.hp -= shot.damage;
           }
         });
