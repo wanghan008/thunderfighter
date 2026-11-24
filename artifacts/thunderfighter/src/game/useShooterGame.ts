@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
-export type GameStatus = "ready" | "running" | "paused" | "gameover" | "victory";
+export type GameStatus = "ready" | "running" | "paused" | "upgrade" | "gameover" | "victory";
+export type WeaponType = "laser" | "homing" | "spread" | "piercing";
+export type UpgradeChoice = { id: "damage" | "rate" | "armor" | "mobility"; name: string; description: string; icon: string };
 
 type Shot = {
   x: number;
@@ -10,6 +12,10 @@ type Shot = {
   radius: number;
   damage: number;
   color: string;
+  piercing?: boolean;
+  homing?: boolean;
+  hitEnemies?: Enemy[];
+  hitBoss?: boolean;
 };
 
 type Enemy = {
@@ -21,6 +27,7 @@ type Enemy = {
   speed: number;
   phase: number;
   fireTimer: number;
+  kind: "basic" | "fast" | "heavy" | "suicide" | "tracker";
 };
 
 type Drop = {
@@ -77,6 +84,7 @@ type Runtime = {
   bossSpawned: boolean;
   score: number;
   lives: number;
+  maxLives: number;
   weaponLevel: number;
   bombCount: number;
   bombFlash: number;
@@ -85,6 +93,10 @@ type Runtime = {
   combo: number;
   comboTimer: number;
   shieldCharges: number;
+  weaponType: WeaponType;
+  damageLevel: number;
+  fireRateLevel: number;
+  mobilityLevel: number;
 };
 
 const WIDTH = 480;
@@ -111,6 +123,7 @@ function createRuntime(): Runtime {
     bossSpawned: false,
     score: 0,
     lives: 3,
+    maxLives: 3,
     weaponLevel: 1,
     bombCount: 2,
     bombFlash: 0,
@@ -119,6 +132,10 @@ function createRuntime(): Runtime {
     combo: 0,
     comboTimer: 0,
     shieldCharges: 0,
+    weaponType: "laser",
+    damageLevel: 0,
+    fireRateLevel: 0,
+    mobilityLevel: 0,
   };
 }
 
@@ -232,6 +249,8 @@ export function useShooterGame() {
   const [spreadBuffTime, setSpreadBuffTime] = useState(0);
   const [combo, setCombo] = useState(0);
   const [shieldCharges, setShieldCharges] = useState(0);
+  const [weaponType, setWeaponType] = useState<WeaponType>("laser");
+  const [upgradeChoices, setUpgradeChoices] = useState<UpgradeChoice[]>([]);
   const bestScoreRef = useRef(bestScore);
 
   useEffect(() => {
@@ -296,6 +315,15 @@ export function useShooterGame() {
       return;
     }
     setStage(game.stage);
+    const choices: UpgradeChoice[] = [
+      { id: "damage", name: "超载核心", description: "所有武器伤害永久提升 25%", icon: "✦" },
+      { id: "rate", name: "极速供能", description: "武器射速永久提升 15%", icon: "⚡" },
+      { id: "armor", name: "复合装甲", description: "最大装甲 +1，并立即修复 1 格", icon: "⬡" },
+      { id: "mobility", name: "矢量引擎", description: "战机移动速度永久提升 12%", icon: "➤" },
+    ];
+    const offset = (clearedStage - 1) % choices.length;
+    setUpgradeChoices([...choices.slice(offset), ...choices.slice(0, offset)].slice(0, 3));
+    updateStatus("upgrade");
   }, [recordLeaderboard, updateBestScore, updateStatus]);
 
   const startGame = useCallback(() => {
@@ -313,6 +341,8 @@ export function useShooterGame() {
     setSpreadBuffTime(0);
     setCombo(0);
     setShieldCharges(0);
+    setWeaponType("laser");
+    setUpgradeChoices([]);
     updateStatus("running");
   }, [updateStatus]);
 
@@ -334,6 +364,22 @@ export function useShooterGame() {
   const restartGame = useCallback(() => {
     startGame();
   }, [startGame]);
+
+  const chooseWeapon = useCallback((nextWeapon: WeaponType) => {
+    runtimeRef.current.weaponType = nextWeapon;
+    setWeaponType(nextWeapon);
+  }, []);
+
+  const chooseUpgrade = useCallback((id: UpgradeChoice["id"]) => {
+    const game = runtimeRef.current;
+    if (statusRef.current !== "upgrade") return;
+    if (id === "damage") game.damageLevel += 1;
+    if (id === "rate") game.fireRateLevel += 1;
+    if (id === "armor") { game.maxLives = Math.min(5, game.maxLives + 1); game.lives = Math.min(game.maxLives, game.lives + 1); setLives(game.lives); }
+    if (id === "mobility") game.mobilityLevel += 1;
+    setUpgradeChoices([]);
+    updateStatus("running");
+  }, [updateStatus]);
 
   const activateBomb = useCallback(() => {
     const game = runtimeRef.current;
@@ -420,19 +466,22 @@ export function useShooterGame() {
     const createEnemy = (elapsed: number) => {
       const game = runtimeRef.current;
       const difficulty = game.stage;
-      const heavy = Math.random() < Math.min(0.12 + difficulty * 0.035, 0.48);
-      const radius = heavy ? 19 : 13;
+      const roll = Math.random();
+      const kind: Enemy["kind"] = roll < 0.18 ? "fast" : roll < 0.31 ? "heavy" : roll < 0.43 ? "suicide" : roll < 0.58 ? "tracker" : "basic";
+      const heavy = kind === "heavy";
+      const radius = heavy ? 19 : kind === "fast" || kind === "suicide" ? 11 : 13;
       const normalHp = difficulty >= 7 ? 2 : 1;
-      const hp = heavy ? 2 + Math.floor(difficulty / 4) : normalHp;
+      const hp = heavy ? 4 + Math.floor(difficulty / 3) : kind === "tracker" ? 2 : normalHp;
       game.enemies.push({
         x: radius + Math.random() * (WIDTH - radius * 2),
         y: -30,
         radius,
         hp,
         maxHp: hp,
-        speed: ((heavy ? 58 : 84) + Math.min(elapsed * 0.35, 28)) * (1 + difficulty * 0.075),
+        speed: ((kind === "fast" ? 148 : kind === "suicide" ? 118 : heavy ? 48 : 84) + Math.min(elapsed * 0.35, 28)) * (1 + difficulty * 0.065),
         phase: Math.random() * Math.PI * 2,
-        fireTimer: Math.max(0.8, 2.6 - difficulty * 0.14) + Math.random() * 0.9,
+        fireTimer: kind === "tracker" || heavy ? Math.max(0.75, 2.2 - difficulty * 0.1) : 99,
+        kind,
       });
     };
 
@@ -483,7 +532,7 @@ export function useShooterGame() {
 
     const firePlayerShots = () => {
       const game = runtimeRef.current;
-      const patterns = game.spreadBuffTime > 0
+      const patterns = game.weaponType === "spread" || game.spreadBuffTime > 0
         ? [
             { offset: -28, vx: -34 },
             { offset: -14, vx: -18 },
@@ -510,8 +559,11 @@ export function useShooterGame() {
           vx: pattern.vx,
           vy: -470,
           radius: 3.5,
-          damage: 1,
-          color: game.weaponLevel > 1 ? "#82f7ff" : "#ffe08a",
+          damage: (game.weaponType === "laser" ? 2 : 1) * (1 + game.damageLevel * 0.25),
+          color: game.weaponType === "laser" ? "#70f7ff" : game.weaponType === "homing" ? "#ff9b62" : game.weaponType === "spread" ? "#d795ff" : "#ffe08a",
+          homing: game.weaponType === "homing",
+          piercing: game.weaponType === "piercing",
+          hitEnemies: game.weaponType === "piercing" ? [] : undefined,
         });
       });
     };
@@ -534,19 +586,20 @@ export function useShooterGame() {
         Number(keysRef.current.has("ArrowDown") || keysRef.current.has("KeyS")) -
         Number(keysRef.current.has("ArrowUp") || keysRef.current.has("KeyW"));
       const diagonal = horizontal !== 0 && vertical !== 0 ? Math.SQRT1_2 : 1;
+      const moveSpeed = 280 * Math.pow(1.12, game.mobilityLevel);
       game.playerX = Math.max(
         24,
-        Math.min(WIDTH - 24, game.playerX + horizontal * 280 * diagonal * dt),
+        Math.min(WIDTH - 24, game.playerX + horizontal * moveSpeed * diagonal * dt),
       );
       game.playerY = Math.max(
         35,
-        Math.min(HEIGHT - 34, game.playerY + vertical * 280 * diagonal * dt),
+        Math.min(HEIGHT - 34, game.playerY + vertical * moveSpeed * diagonal * dt),
       );
 
       game.fireTimer -= dt;
       if ((keysRef.current.has("Space") || touchActiveRef.current) && game.fireTimer <= 0) {
         firePlayerShots();
-        game.fireTimer = game.spreadBuffTime > 0 ? 0.115 : 0.145;
+        game.fireTimer = (game.weaponType === "laser" ? 0.19 : game.weaponType === "spread" ? 0.22 : 0.28) * Math.pow(0.85, game.fireRateLevel) * (game.spreadBuffTime > 0 ? 0.8 : 1);
       }
       game.spreadBuffTime = Math.max(0, game.spreadBuffTime - dt);
 
@@ -562,6 +615,15 @@ export function useShooterGame() {
       }
 
       game.shots.forEach((shot) => {
+        if (shot.homing) {
+          const target = game.enemies.reduce<Enemy | null>((best, enemy) => !best || enemy.y < best.y ? enemy : best, null);
+          const targetX = target?.x ?? game.boss?.x; const targetY = target?.y ?? game.boss?.y;
+          if (targetX !== undefined && targetY !== undefined) {
+            const dx = targetX - shot.x; const dy = targetY - shot.y; const len = Math.max(1, Math.hypot(dx, dy));
+            shot.vx += (dx / len * 260 - shot.vx) * Math.min(1, dt * 3.5);
+            shot.vy += (dy / len * 260 - shot.vy) * Math.min(1, dt * 3.5);
+          }
+        }
         shot.x += shot.vx * dt;
         shot.y += shot.vy * dt;
       });
@@ -572,9 +634,16 @@ export function useShooterGame() {
 
       game.enemies.forEach((enemy) => {
         enemy.y += enemy.speed * dt;
-        enemy.x += Math.sin(game.elapsed * 1.45 + enemy.phase) * 33 * dt;
+        if (enemy.kind === "suicide") {
+          const dx = game.playerX - enemy.x; const dy = game.playerY - enemy.y; const len = Math.max(1, Math.hypot(dx, dy));
+          enemy.x += (dx / len) * enemy.speed * 0.72 * dt;
+        } else if (enemy.kind === "tracker") {
+          enemy.x += Math.sign(game.playerX - enemy.x) * Math.min(95 * dt, Math.abs(game.playerX - enemy.x));
+        } else {
+          enemy.x += Math.sin(game.elapsed * (enemy.kind === "fast" ? 2.7 : 1.45) + enemy.phase) * (enemy.kind === "fast" ? 58 : 33) * dt;
+        }
         enemy.fireTimer -= dt;
-        if (enemy.fireTimer <= 0 && enemy.y > 35 && enemy.y < HEIGHT * 0.75) {
+        if ((enemy.kind === "tracker" || enemy.kind === "heavy") && enemy.fireTimer <= 0 && enemy.y > 35 && enemy.y < HEIGHT * 0.75) {
           const dx = game.playerX - enemy.x;
           const dy = game.playerY - enemy.y;
           const length = Math.max(1, Math.hypot(dx, dy));
@@ -588,7 +657,7 @@ export function useShooterGame() {
             damage: 1,
             color: "#ff728e",
           });
-          enemy.fireTimer = 3.4 + Math.random() * 1.2;
+          enemy.fireTimer = (enemy.kind === "heavy" ? 2.5 : 1.8) + Math.random() * 0.9;
         }
       });
       game.enemies = game.enemies.filter((enemy) => enemy.y < HEIGHT + 45);
@@ -619,8 +688,9 @@ export function useShooterGame() {
 
       game.enemies.forEach((enemy) => {
         game.shots.forEach((shot) => {
-          if (circleHit(shot.x, shot.y, shot.radius, enemy.x, enemy.y, enemy.radius)) {
-            shot.y = -40;
+          if (circleHit(shot.x, shot.y, shot.radius, enemy.x, enemy.y, enemy.radius) && !shot.hitEnemies?.includes(enemy)) {
+            if (!shot.piercing) shot.y = -40;
+            else shot.hitEnemies?.push(enemy);
             enemy.hp -= shot.damage;
           }
         });
@@ -700,7 +770,7 @@ export function useShooterGame() {
           } else if (drop.kind === "bomb") {
             game.bombCount = Math.min(5, game.bombCount + 1); setBombCount(game.bombCount);
           } else if (drop.kind === "life") {
-            game.lives = Math.min(5, game.lives + 1); setLives(game.lives);
+            game.lives = Math.min(game.maxLives, game.lives + 1); setLives(game.lives);
           } else if (drop.kind === "shield") {
             game.shieldCharges = Math.min(2, game.shieldCharges + 1); setShieldCharges(game.shieldCharges);
           } else if (game.weaponLevel < 3) {
@@ -738,8 +808,9 @@ export function useShooterGame() {
           boss.fireTimer = Math.max(0.5, 1.55 - game.stage * 0.085);
         }
         game.shots.forEach((shot) => {
-          if (circleHit(shot.x, shot.y, shot.radius, boss.x, boss.y, 44)) {
-            shot.y = -40;
+          if (circleHit(shot.x, shot.y, shot.radius, boss.x, boss.y, 44) && !shot.hitBoss) {
+            if (!shot.piercing) shot.y = -40;
+            else shot.hitBoss = true;
             boss.hp -= shot.damage;
           }
         });
@@ -846,14 +917,9 @@ export function useShooterGame() {
         ctx.save();
         ctx.translate(enemy.x, enemy.y);
         ctx.rotate(Math.PI);
-        drawShip(
-          ctx,
-          0,
-          0,
-          enemy.maxHp > 1 ? 1.15 : 0.82,
-          enemy.maxHp > 1 ? "#ff9d69" : "#ff6f9b",
-          enemy.maxHp > 1 ? "#ff794b" : "#fa4d93",
-        );
+        const enemyColors = enemy.kind === "fast" ? ["#f6d365", "#ffbd45"] : enemy.kind === "heavy" ? ["#ff9d69", "#ff794b"] : enemy.kind === "suicide" ? ["#ff526f", "#ff284e"] : enemy.kind === "tracker" ? ["#b18cff", "#8b5cff"] : ["#ff6f9b", "#fa4d93"];
+        drawShip(ctx, 0, 0, enemy.kind === "heavy" ? 1.22 : enemy.kind === "fast" ? 0.72 : 0.88, enemyColors[0], enemyColors[1]);
+        if (enemy.kind === "suicide") { ctx.strokeStyle = "#ff405f"; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(0, 0, enemy.radius + 5, 0, Math.PI * 2); ctx.stroke(); }
         ctx.restore();
         if (enemy.maxHp > 1) {
           ctx.fillStyle = "rgba(6, 10, 28, 0.85)";
@@ -1125,6 +1191,10 @@ export function useShooterGame() {
     spreadBuffTime,
     combo,
     shieldCharges,
+    weaponType,
+    upgradeChoices,
+    chooseWeapon,
+    chooseUpgrade,
     startGame,
     pauseGame,
     resumeGame,

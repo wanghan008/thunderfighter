@@ -586,3 +586,25 @@ kbd {
 
 /* Shield pickup HUD */
 .shield-count { margin-left: 6px; color: #7bd8ff; font: 9px var(--app-font-mono); text-shadow: 0 0 8px rgba(99, 201, 255, .45); }
+
+
+/* Phase 1 gameplay expansion */
+.weapon-panel { padding: 14px; border: 1px solid rgba(125,157,171,.22); background: rgba(16,27,39,.62); }
+.weapon-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 7px; margin-top: 11px; }
+.weapon-choice { display: flex; min-width: 0; min-height: 54px; padding: 8px; flex-direction: column; gap: 4px; border: 1px solid rgba(125,157,171,.24); color: #9db2b8; background: rgba(5,13,23,.65); text-align: left; cursor: pointer; }
+.weapon-choice strong { color: #dce8e7; font-size: 11px; }
+.weapon-choice small { color: #81949b; font-size: 9px; }
+.weapon-choice.selected { border-color: #f5c744; background: rgba(245,199,68,.1); box-shadow: inset 0 0 0 1px rgba(245,199,68,.18); }
+.weapon-choice:disabled { opacity: .55; cursor: not-allowed; }
+.upgrade-options { width: min(100%,360px); }
+.upgrade-title { margin: 13px 0 7px; color: #f5c744; font-size: 27px; font-weight: 900; }
+.upgrade-options .overlay-copy { margin-bottom: 14px; }
+.upgrade-card { display: flex; width: 100%; min-height: 64px; margin: 8px 0; padding: 10px 12px; align-items: center; gap: 12px; border: 1px solid rgba(83,190,208,.35); color: #dce8e7; background: rgba(10,24,38,.92); text-align: left; cursor: pointer; }
+.upgrade-card:hover { border-color: #f5c744; background: rgba(39,45,45,.96); }
+.upgrade-card > span:nth-child(2) { display: flex; flex: 1; flex-direction: column; gap: 5px; }
+.upgrade-card strong { color: #f5d36b; font-size: 13px; }
+.upgrade-card small { color: #91a5ac; font-size: 10px; line-height: 1.4; }
+.upgrade-icon { display: grid; width: 32px; height: 32px; place-items: center; border: 1px solid rgba(245,199,68,.4); color: #f5c744; font-size: 18px; }
+@media (max-width: 650px) { .weapon-panel { padding: 10px; } .weapon-choice { min-height: 48px; padding: 6px; } }
+
+@media (max-width: 900px) { .weapon-panel { grid-column: 1 / -1; } }
