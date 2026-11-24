@@ -1,7 +1,7 @@
 import { useShooterGame, type UpgradeChoice, type WeaponType } from './game/useShooterGame';
 import { ArrowUpRight, Bomb, Crosshair, Pause, Play, RotateCcw, Shield, Zap } from 'lucide-react';
 
-type GameStatus = 'ready' | 'running' | 'paused' | 'gameover' | 'victory';
+type GameStatus = 'ready' | 'running' | 'paused' | 'upgrade' | 'gameover' | 'victory';
 
 function formatScore(value: number) {
   return Math.max(0, value).toString().padStart(6, '0');
