@@ -78,7 +78,14 @@ type Boss = {
   sweepActive: number;
   sweepX: number;
   sweepDirection: number;
+  sweepGapOffset: number;
+  chargeWarning: number;
+  chargeActive: number;
+  chargeVx: number;
+  chargeVy: number;
+  chargeHit: boolean;
   invulnerable: number;
+  shieldCounterPending: boolean;
   shieldCooldown: number;
 };
 
@@ -536,7 +543,9 @@ export function useShooterGame() {
         sweepTimer: 3, sweepWarning: 0, sweepActive: 0,
         sweepX: spawnSide === "left" ? 24 : WIDTH - 24,
         sweepDirection: spawnSide === "left" ? 1 : -1,
-        invulnerable: 0, shieldCooldown: 6 + Math.random() * 3,
+        sweepGapOffset: 0,
+        chargeWarning: 0, chargeActive: 0, chargeVx: 0, chargeVy: 0, chargeHit: false,
+        invulnerable: 0, shieldCooldown: 6 + Math.random() * 3, shieldCounterPending: false,
       };
       game.bossSpawned = true;
       setBossName(game.boss.name);
@@ -707,6 +716,15 @@ export function useShooterGame() {
       game.enemies = game.enemies.filter((enemy) => enemy.y < HEIGHT + 45);
 
       game.enemyShots.forEach((shot) => {
+        if (shot.homing) {
+          const dx = game.playerX - shot.x;
+          const dy = game.playerY - shot.y;
+          const length = Math.max(1, Math.hypot(dx, dy));
+          const speed = Math.max(145, Math.hypot(shot.vx, shot.vy));
+          const turn = Math.min(1, dt * 2.3);
+          shot.vx += (dx / length * speed - shot.vx) * turn;
+          shot.vy += (dy / length * speed - shot.vy) * turn;
+        }
         shot.x += shot.vx * dt;
         shot.y += shot.vy * dt;
         if (
@@ -830,10 +848,32 @@ export function useShooterGame() {
         const boss = game.boss;
         const stage = boss.stage;
         boss.phase += dt;
-        boss.y = Math.min(93, boss.y + 85 * dt);
-        const moveRate = stage >= 8 ? 1.05 : stage >= 5 ? 0.82 : 0.62;
-        const moveWidth = stage >= 8 ? 112 : stage >= 5 ? 82 : 48;
-        boss.x = Math.max(58, Math.min(WIDTH - 58, boss.anchorX + Math.sin(boss.phase * moveRate) * moveWidth));
+        if (boss.chargeWarning > 0) {
+          boss.chargeWarning = Math.max(0, boss.chargeWarning - dt);
+          if (boss.chargeWarning === 0) {
+            const dx = game.playerX - boss.x;
+            const dy = game.playerY - boss.y;
+            const len = Math.max(1, Math.hypot(dx, dy));
+            boss.chargeVx = dx / len * 470;
+            boss.chargeVy = dy / len * 470;
+            boss.chargeActive = 0.62;
+            boss.chargeHit = false;
+          }
+        }
+        if (boss.chargeActive > 0) {
+          boss.chargeActive = Math.max(0, boss.chargeActive - dt);
+          boss.x = Math.max(42, Math.min(WIDTH - 42, boss.x + boss.chargeVx * dt));
+          boss.y = Math.max(50, Math.min(HEIGHT - 90, boss.y + boss.chargeVy * dt));
+          if (!boss.chargeHit && circleHit(game.playerX, game.playerY, PLAYER_RADIUS, boss.x, boss.y, 43)) {
+            boss.chargeHit = true;
+            damagePlayer();
+          }
+        } else {
+          boss.y += (93 - boss.y) * Math.min(1, dt * 2.6);
+          const moveRate = stage >= 8 ? 1.05 : stage >= 5 ? 0.82 : 0.62;
+          const moveWidth = stage >= 8 ? 112 : stage >= 5 ? 82 : 48;
+          boss.x = Math.max(58, Math.min(WIDTH - 58, boss.anchorX + Math.sin(boss.phase * moveRate) * moveWidth));
+        }
         const hpRatio = boss.hp / boss.maxHp;
         const nextPhase = hpRatio <= 0.3 ? 3 : hpRatio <= 0.65 ? 2 : 1;
         if (nextPhase !== boss.phaseIndex) {
@@ -857,16 +897,34 @@ export function useShooterGame() {
         if (boss.sweepActive > 0) {
           boss.sweepActive = Math.max(0, boss.sweepActive - dt);
           boss.sweepX += boss.sweepDirection * 330 * dt;
-          if (Math.abs(game.playerX - boss.sweepX) < 15 + PLAYER_RADIUS * 0.55 && game.playerY > boss.y + 24) damagePlayer();
+          const beamY = game.playerY - (boss.y + 25) + boss.sweepGapOffset;
+          const beamCycle = ((beamY % 150) + 150) % 150;
+          const insideSafeGap = beamCycle >= 88 && beamCycle <= 150;
+          if (Math.abs(game.playerX - boss.sweepX) < 15 + PLAYER_RADIUS * 0.55
+            && game.playerY > boss.y + 24 && !insideSafeGap) damagePlayer();
           if (boss.sweepActive === 0) boss.sweepDirection *= -1;
         }
-        boss.shieldCooldown -= dt;
-        if (boss.shieldCooldown <= 0 && boss.invulnerable <= 0) {
-          boss.invulnerable = 1.35;
-          boss.shieldCooldown = 8 + Math.random() * 4;
-          emitExplosion(boss.x, boss.y, "#78dfff", 16);
+        if ([1, 7, 10].includes(stage)) {
+          boss.shieldCooldown -= dt;
+          if (boss.shieldCooldown <= 0 && boss.invulnerable <= 0) {
+            boss.invulnerable = 1.35;
+            boss.shieldCooldown = 8 + Math.random() * 4;
+            boss.shieldCounterPending = true;
+            emitExplosion(boss.x, boss.y, "#78dfff", 16);
+          }
+          const wasShielded = boss.invulnerable > 0;
+          boss.invulnerable = Math.max(0, boss.invulnerable - dt);
+          if (wasShielded && boss.invulnerable === 0 && boss.shieldCounterPending) {
+            const count = stage === 10 ? 9 : 5;
+            const base = Math.atan2(game.playerX - boss.x, game.playerY - boss.y);
+            for (let i = 0; i < count; i += 1) {
+              const angle = base + (i / Math.max(1, count - 1) - 0.5) * 0.9;
+              const speed = 190 + stage * 7;
+              game.enemyShots.push({ x: boss.x, y: boss.y + 22, vx: Math.sin(angle) * speed, vy: Math.cos(angle) * speed, radius: 4.5, damage: 1, color: "#7de5ff" });
+            }
+            boss.shieldCounterPending = false;
+          }
         }
-        boss.invulnerable = Math.max(0, boss.invulnerable - dt);
 
         // Telegraph attacks first, then activate them so players have time to dodge.
         if (boss.laserWarning > 0) {
@@ -907,46 +965,84 @@ export function useShooterGame() {
               game.enemyShots.push({ x: boss.x, y: boss.y + 28, vx: Math.sin(angle) * bulletSpeed, vy: Math.cos(angle) * bulletSpeed, radius: 4.2, damage: 1, color });
             }
           };
-          if (stage === 1) { fan(3 + phaseBoost * 2, 0.55); boss.attackTimer = 1.9; }
-          else if (stage === 2) {
-            [-1, 1].forEach((side) => game.enemyShots.push({ x: boss.x + side * 43, y: boss.y + 12, vx: (game.playerX - boss.x) * 0.42, vy: 175 + phaseBoost * 25, radius: 5, damage: 1, color: "#ffb45f" }));
-            fan(3, 0.38, "#ffc06a"); boss.attackTimer = 1.65;
-          } else if (stage === 3) { fan(7 + phaseBoost * 2, 0.92, "#ff815f"); aimed(1 + phaseBoost, 0.24); boss.attackTimer = 1.7; }
-          else if (stage === 4) {
-            boss.laserXs = [Math.max(28, Math.min(WIDTH - 28, game.playerX))]; boss.laserWarning = 0.95;
-            fan(5, 0.48, "#ffdb70"); boss.attackTimer = 2.4 - phaseBoost * 0.25;
+          const ring = (count: number, color = "#a58bff") => {
+            for (let i = 0; i < count; i += 1) {
+              const angle = (Math.PI * 2 * i) / count + boss.phase * 0.18;
+              const speed = bulletSpeed * 0.82;
+              game.enemyShots.push({ x: boss.x, y: boss.y + 12, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed, radius: 4.5, damage: 1, color });
+            }
+          };
+          const missiles = (count: number) => {
+            for (let i = 0; i < count; i += 1) {
+              const offset = (i - (count - 1) / 2) * 18;
+              const dx = game.playerX - (boss.x + offset);
+              const dy = game.playerY - (boss.y + 24);
+              const len = Math.max(1, Math.hypot(dx, dy));
+              const speed = 145 + stage * 8;
+              game.enemyShots.push({ x: boss.x + offset, y: boss.y + 24, vx: dx / len * speed, vy: dy / len * speed, radius: 6, damage: 1, color: "#ff9b62", homing: true });
+            }
+          };
+          const summon = (count: number) => {
+            for (let i = 0; i < count && game.enemies.length < 8; i += 1) {
+              const offset = (i - (count - 1) / 2) * 48;
+              const hp = stage >= 8 ? 2 : 1;
+              game.enemies.push({ x: Math.max(20, Math.min(WIDTH - 20, boss.x + offset)), y: boss.y + 30, radius: 11, hp, maxHp: hp, speed: 92 + stage * 4, phase: Math.random() * Math.PI * 2, fireTimer: 2.2, kind: "tracker" });
+            }
+          };
+          const charge = () => { boss.chargeWarning = 0.78; };
+          if (stage === 1) {
+            fan(4 + phaseBoost, 0.62, "#7de5ff");
+            boss.attackTimer = 1.8;
+          } else if (stage === 2) {
+            missiles(1 + (phaseBoost > 0 ? 1 : 0));
+            fan(3, 0.34, "#ffb45f");
+            boss.attackTimer = 2.35;
+          } else if (stage === 3) {
+            summon(2 + phaseBoost);
+            ring(6 + phaseBoost * 2, "#ff815f");
+            boss.attackTimer = 2.8;
+          } else if (stage === 4) {
+            charge();
+            fan(4, 0.5, "#ffdb70");
+            boss.attackTimer = 3.1;
           } else if (stage === 5) {
-            fan(9, 0.88, "#d58aff"); aimed(3, 0.48, "#d58aff");
-            if (phaseBoost > 0 && game.enemies.length < 5) { createEnemy(game.stageElapsed); createEnemy(game.stageElapsed); }
-            boss.attackTimer = 1.55;
+            summon(3 + phaseBoost);
+            fan(7 + phaseBoost * 2, 0.82, "#d58aff");
+            aimed(2 + phaseBoost, 0.48, "#d58aff");
+            boss.attackTimer = 2.25;
           } else if (stage === 6) {
-            boss.aoeX = Math.max(48, Math.min(WIDTH - 48, game.playerX)); boss.aoeY = Math.max(180, Math.min(HEIGHT - 80, game.playerY)); boss.aoeRadius = 66; boss.aoeWarning = 1.05;
-            aimed(3 + phaseBoost * 2, 0.42, "#ff9b62"); boss.attackTimer = 2.15;
+            boss.aoeX = Math.max(48, Math.min(WIDTH - 48, game.playerX)); boss.aoeY = Math.max(180, Math.min(HEIGHT - 80, game.playerY)); boss.aoeRadius = 72; boss.aoeWarning = 1.05;
+            missiles(2 + phaseBoost);
+            boss.attackTimer = 2.65;
           } else if (stage === 7) {
             boss.laserXs = [boss.x - 48, boss.x + 48]; boss.laserWarning = 0.9;
-            fan(7, 0.75, "#74eaff"); boss.attackTimer = 2.25 - phaseBoost * 0.2;
+            ring(8 + phaseBoost * 2, "#74eaff");
+            boss.attackTimer = 2.55;
           } else if (stage === 8) {
+            ring(10 + phaseBoost * 2, "#a58bff");
             boss.spiralAngle += 0.55 + phaseBoost * 0.2;
-            for (let i = 0; i < 8; i += 1) {
-              const angle = boss.spiralAngle + i * Math.PI / 4;
+            for (let i = 0; i < 6; i += 1) {
+              const angle = boss.spiralAngle + i * Math.PI / 3;
               game.enemyShots.push({ x: boss.x, y: boss.y + 12, vx: Math.cos(angle) * bulletSpeed, vy: Math.sin(angle) * bulletSpeed, radius: 4.8, damage: 1, color: "#a58bff" });
             }
-            boss.aoeX = Math.max(48, Math.min(WIDTH - 48, game.playerX)); boss.aoeY = Math.max(180, Math.min(HEIGHT - 80, game.playerY)); boss.aoeRadius = 78; boss.aoeWarning = 0.85;
-            boss.attackTimer = 1.8;
+            boss.attackTimer = 2.1;
           } else if (stage === 9) {
-            boss.laserXs = [Math.max(25, Math.min(WIDTH - 25, game.playerX))]; boss.laserWarning = 0.78;
+            charge();
+            missiles(3 + phaseBoost);
             boss.aoeX = Math.max(50, Math.min(WIDTH - 50, game.playerX)); boss.aoeY = Math.max(180, Math.min(HEIGHT - 90, game.playerY)); boss.aoeRadius = 82; boss.aoeWarning = 1.0;
-            aimed(5, 0.65, "#ff526e"); boss.attackTimer = 2.15 - phaseBoost * 0.25;
+            boss.attackTimer = 3.0;
           } else {
-            if (boss.phaseIndex === 1) { fan(9, 1.05, "#ff6b8e"); aimed(3, 0.55); }
+            if (boss.phaseIndex === 1) { fan(8, 1.0, "#ff6b8e"); missiles(2); }
             else if (boss.phaseIndex === 2) {
               boss.laserXs = [boss.x - 76, boss.x, boss.x + 76]; boss.laserWarning = 0.85;
               boss.aoeX = Math.max(55, Math.min(WIDTH - 55, game.playerX)); boss.aoeY = Math.max(190, Math.min(HEIGHT - 90, game.playerY)); boss.aoeRadius = 88; boss.aoeWarning = 1.05;
+              missiles(3); summon(2);
             } else {
-              fan(13, 1.28, "#fff078"); aimed(5, 0.8, "#ff557b");
+              fan(12, 1.25, "#fff078"); missiles(4); ring(8, "#ff557b");
               boss.laserXs = [boss.x - 90, boss.x + 90]; boss.laserWarning = 0.72;
+              charge();
             }
-            boss.attackTimer = boss.phaseIndex === 3 ? 1.25 : 1.7;
+            boss.attackTimer = boss.phaseIndex === 3 ? 1.85 : 2.35;
           }
         }
 
@@ -1155,16 +1251,49 @@ export function useShooterGame() {
           ctx.restore();
         }
 
+        if (boss.chargeWarning > 0 || boss.chargeActive > 0) {
+          ctx.save();
+          const charging = boss.chargeActive > 0;
+          ctx.globalAlpha = charging ? 0.72 : 0.3 + Math.sin(boss.phase * 20) * 0.12;
+          ctx.strokeStyle = charging ? "#ff4d68" : "#ffd08a";
+          ctx.lineWidth = charging ? 4 : 2;
+          ctx.setLineDash(charging ? [] : [8, 7]);
+          ctx.beginPath(); ctx.moveTo(boss.x, boss.y + 20); ctx.lineTo(game.playerX, game.playerY); ctx.stroke();
+          ctx.setLineDash([]);
+          ctx.fillStyle = charging ? "#ff4d68" : "#ffd08a";
+          ctx.beginPath(); ctx.arc(game.playerX, game.playerY, charging ? 28 : 20, 0, Math.PI * 2); ctx.stroke();
+          ctx.restore();
+        }
+
         // Telegraph overlays: red/pink lines and rings show where the next boss attack will land.
         if (boss.sweepWarning > 0 || boss.sweepActive > 0) {
           ctx.save();
           const active = boss.sweepActive > 0;
-          ctx.globalAlpha = active ? 0.88 : 0.3 + Math.sin(boss.phase * 24) * 0.16;
+          ctx.globalAlpha = active ? 0.9 : 0.32 + Math.sin(boss.phase * 24) * 0.12;
           ctx.fillStyle = active ? "#ff315e" : "#ffc0cf";
-          ctx.shadowColor = "#ff416e"; ctx.shadowBlur = active ? 28 : 8;
-          ctx.fillRect(boss.sweepX - 8, boss.y + 25, 16, HEIGHT - boss.y - 25);
-          ctx.strokeStyle = "#fff4f6"; ctx.lineWidth = 2;
-          ctx.beginPath(); ctx.moveTo(boss.sweepX, boss.y + 25); ctx.lineTo(boss.sweepX, HEIGHT); ctx.stroke();
+          ctx.shadowColor = "#ff416e"; ctx.shadowBlur = active ? 22 : 8;
+          const beamTop = boss.y + 25;
+          const beamBottom = HEIGHT;
+          const segmentHeight = 88;
+          const gapHeight = 62;
+          const cycle = segmentHeight + gapHeight;
+          let y = beamTop;
+          while (y < beamBottom) {
+            const segmentEnd = Math.min(beamBottom, y + segmentHeight);
+            ctx.fillRect(boss.sweepX - 8, y, 16, segmentEnd - y);
+            ctx.strokeStyle = "#fff4f6"; ctx.lineWidth = 2;
+            ctx.beginPath(); ctx.moveTo(boss.sweepX, y); ctx.lineTo(boss.sweepX, segmentEnd); ctx.stroke();
+            const gapTop = segmentEnd;
+            const gapBottom = Math.min(beamBottom, gapTop + gapHeight);
+            if (gapBottom > gapTop) {
+              ctx.globalAlpha = active ? 0.5 : 0.2;
+              ctx.strokeStyle = "#8fffe0"; ctx.lineWidth = 2;
+              ctx.beginPath(); ctx.moveTo(boss.sweepX - 13, gapTop + 4); ctx.lineTo(boss.sweepX + 13, gapTop + 4);
+              ctx.moveTo(boss.sweepX - 13, gapBottom - 4); ctx.lineTo(boss.sweepX + 13, gapBottom - 4); ctx.stroke();
+              ctx.globalAlpha = active ? 0.9 : 0.32 + Math.sin(boss.phase * 24) * 0.12;
+            }
+            y += cycle;
+          }
           ctx.restore();
         }
         if (boss.laserWarning > 0 || boss.laserActive > 0) {
