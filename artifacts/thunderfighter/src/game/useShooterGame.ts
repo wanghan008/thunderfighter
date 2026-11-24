@@ -1177,7 +1177,7 @@ export function useShooterGame() {
         ctx.fill();
         ctx.shadowBlur = 0;
         ctx.fillStyle = "#08202a"; ctx.font = "bold 11px sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
-        const symbol = isSpread ? "Ⅲ" : drop.kind === "bomb" ? "B" : drop.kind === "life" ? "♥" : drop.kind === "shield" ? "S" : "+";
+        const symbol = isSpread ? "Ⅲ" : drop.kind === "bomb" ? "B" : drop.kind === "life" ? "♥" : drop.kind === "shield" ? "S" : drop.kind === "rapid" ? "R" : drop.kind === "power" ? "P" : drop.kind === "weapon" ? "W" : "+";
         ctx.fillText(symbol, 0, 0);
         ctx.restore();
       });
