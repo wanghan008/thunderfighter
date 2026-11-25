@@ -177,6 +177,7 @@ function App() {
             <label className="audio-range"><span>音乐音量 <b>{Math.round(audioSettings.musicVolume * 100)}%</b></span><input type="range" min="0" max="1" step="0.01" value={audioSettings.musicVolume} onChange={(event) => updateAudioSettings({ musicVolume: Number(event.target.value) })} /></label>
             <label className="audio-switch"><input type="checkbox" checked={audioSettings.sfxEnabled} onChange={(event) => updateAudioSettings({ sfxEnabled: event.target.checked })} /><span>打击音效</span></label>
             <label className="audio-range"><span>音效音量 <b>{Math.round(audioSettings.sfxVolume * 100)}%</b></span><input type="range" min="0" max="1" step="0.01" value={audioSettings.sfxVolume} onChange={(event) => updateAudioSettings({ sfxVolume: Number(event.target.value) })} /></label>
+            <button className="audio-preview" type="button" onClick={() => { unlockAudio(); setMusicMode(status === "running" ? (bossMaxHealth > 0 ? "boss" : "battle") : "menu"); }}>▶ 试听背景音乐</button>
             <p>科幻电子 · 未来战争</p>
           </div>
         )}
