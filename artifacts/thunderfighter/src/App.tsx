@@ -1,5 +1,7 @@
+import { useEffect, useState } from 'react';
 import { useShooterGame, type UpgradeChoice, type WeaponType } from './game/useShooterGame';
-import { ArrowUpRight, Bomb, Crosshair, Pause, Play, RotateCcw, Shield, Zap } from 'lucide-react';
+import { ArrowUpRight, Bomb, Crosshair, Pause, Play, RotateCcw, Shield, Zap, Volume2, VolumeX } from 'lucide-react';
+import { configureAudio, readAudioSettings, setMusicMode, unlockAudio, type AudioSettings } from './game/audio';
 
 type GameStatus = 'ready' | 'running' | 'paused' | 'upgrade' | 'gameover' | 'victory';
 
@@ -131,6 +133,21 @@ function App() {
     restartGame,
     activateBomb,
   } = useShooterGame();
+  const [audioSettings, setAudioSettings] = useState<AudioSettings>(readAudioSettings);
+  const [audioPanelOpen, setAudioPanelOpen] = useState(false);
+
+  useEffect(() => {
+    configureAudio(audioSettings);
+  }, [audioSettings]);
+
+  useEffect(() => {
+    setMusicMode(status === "running" ? (bossMaxHealth > 0 ? "boss" : "battle") : status === "paused" ? "paused" : "menu");
+  }, [status, bossMaxHealth]);
+
+  const updateAudioSettings = (patch: Partial<AudioSettings>) => {
+    setAudioSettings((current) => ({ ...current, ...patch }));
+  };
+
   const bossPercent = bossMaxHealth > 0 ? Math.max(0, Math.min(100, (bossHealth / bossMaxHealth) * 100)) : 0;
   const visibleLives = Math.max(0, Math.min(5, lives));
   const showBoss = status === 'running' && bossMaxHealth > 0;
@@ -146,7 +163,23 @@ function App() {
             <div className="brand-sub">雷霆中队 / 01</div>
           </div>
         </div>
-        <div className="top-status"><span className="signal" /> 星际防御 <span>·</span> 系统在线</div>
+        <div className="topbar-tools">
+          <div className="top-status"><span className="signal" /> 星际防御 <span>·</span> 系统在线</div>
+          <button className="audio-toggle" type="button" onClick={() => { unlockAudio(); setAudioPanelOpen((open) => !open); }} aria-expanded={audioPanelOpen} aria-label="声音设置">
+            {audioSettings.musicEnabled || audioSettings.sfxEnabled ? <Volume2 size={15} /> : <VolumeX size={15} />}
+            <span>声音</span>
+          </button>
+        </div>
+        {audioPanelOpen && (
+          <div className="audio-panel" aria-label="声音设置">
+            <div className="audio-panel-heading"><strong>音频设置</strong><button type="button" onClick={() => setAudioPanelOpen(false)} aria-label="关闭声音设置">×</button></div>
+            <label className="audio-switch"><input type="checkbox" checked={audioSettings.musicEnabled} onChange={(event) => updateAudioSettings({ musicEnabled: event.target.checked })} /><span>背景音乐</span></label>
+            <label className="audio-range"><span>音乐音量 <b>{Math.round(audioSettings.musicVolume * 100)}%</b></span><input type="range" min="0" max="1" step="0.01" value={audioSettings.musicVolume} onChange={(event) => updateAudioSettings({ musicVolume: Number(event.target.value) })} /></label>
+            <label className="audio-switch"><input type="checkbox" checked={audioSettings.sfxEnabled} onChange={(event) => updateAudioSettings({ sfxEnabled: event.target.checked })} /><span>打击音效</span></label>
+            <label className="audio-range"><span>音效音量 <b>{Math.round(audioSettings.sfxVolume * 100)}%</b></span><input type="range" min="0" max="1" step="0.01" value={audioSettings.sfxVolume} onChange={(event) => updateAudioSettings({ sfxVolume: Number(event.target.value) })} /></label>
+            <p>科幻电子 · 未来战争</p>
+          </div>
+        )}
       </header>
 
       <section className="game-layout" aria-label="雷霆战机游戏">
