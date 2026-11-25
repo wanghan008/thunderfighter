@@ -48,7 +48,7 @@ function ensureAudio(): AudioContext | null {
     audioContext = new AudioContextConstructor();
     musicGain = audioContext.createGain();
     sfxGain = audioContext.createGain();
-    musicGain.gain.value = settings.musicEnabled ? settings.musicVolume * 0.34 : 0;
+    musicGain.gain.value = settings.musicEnabled ? settings.musicVolume * 0.9 : 0;
     sfxGain.gain.value = settings.sfxEnabled ? settings.sfxVolume : 0;
     musicGain.connect(audioContext.destination);
     sfxGain.connect(audioContext.destination);
@@ -70,7 +70,7 @@ export function configureAudio(next: AudioSettings): void {
   } catch {
     // Audio preferences are optional; sound still works for this session.
   }
-  if (musicGain) musicGain.gain.setTargetAtTime(settings.musicEnabled ? settings.musicVolume * 0.34 : 0, audioContext!.currentTime, 0.08);
+  if (musicGain) musicGain.gain.setTargetAtTime(settings.musicEnabled ? settings.musicVolume * 0.9 : 0, audioContext!.currentTime, 0.08);
   if (sfxGain) sfxGain.gain.setTargetAtTime(settings.sfxEnabled ? settings.sfxVolume : 0, audioContext!.currentTime, 0.04);
   if (settings.musicEnabled && audioContext?.state === "running" && musicTimer === null) {
     setMusicMode(musicMode);
@@ -130,33 +130,37 @@ function noise(duration: number, volume = 0.22): void {
 
 function playMusicPhrase(): void {
   if (!settings.musicEnabled || !musicGain || !audioContext) return;
-  const battle = musicMode === "battle" || musicMode === "boss";
-  const scale = musicMode === "boss" ? [55, 65.41, 73.42, 82.41, 73.42, 65.41, 49, 58.27] :
-    battle ? [55, 65.41, 73.42, 82.41, 73.42, 65.41, 58.27, 65.41] :
-    [55, 65.41, 73.42, 65.41, 49, 58.27, 65.41, 58.27];
+  // Mid-range synth notes make the soundtrack audible on phone speakers.
+  const scale = musicMode === "boss"
+    ? [110, 130.81, 146.83, 164.81, 146.83, 130.81, 98, 116.54]
+    : musicMode === "battle"
+      ? [130.81, 155.56, 174.61, 196, 174.61, 155.56, 116.54, 130.81]
+      : [110, 130.81, 146.83, 130.81, 98, 116.54, 130.81, 116.54];
   const root = scale[musicStep % scale.length];
   const now = audioContext.currentTime;
+
+  // Soft, filtered synth pad underneath the melody.
   const pad = audioContext.createOscillator();
   const padGain = audioContext.createGain();
   const filter = audioContext.createBiquadFilter();
   pad.type = "sawtooth";
   pad.frequency.setValueAtTime(root, now);
   filter.type = "lowpass";
-  filter.frequency.value = musicMode === "boss" ? 520 : 360;
+  filter.frequency.value = musicMode === "boss" ? 1250 : 980;
   padGain.gain.setValueAtTime(0.0001, now);
-  padGain.gain.linearRampToValueAtTime(musicMode === "boss" ? 0.11 : 0.075, now + 0.12);
-  padGain.gain.setTargetAtTime(0.0001, now + 0.42, 0.22);
+  padGain.gain.linearRampToValueAtTime(musicMode === "boss" ? 0.17 : 0.13, now + 0.08);
+  padGain.gain.setTargetAtTime(0.0001, now + 0.34, 0.2);
   pad.connect(filter);
   filter.connect(padGain);
   padGain.connect(musicGain);
   pad.start(now);
-  pad.stop(now + 1.05);
+  pad.stop(now + 0.82);
 
+  // A clear, restrained arpeggio gives the music a recognizable sci-fi theme.
+  const melody = root * (musicStep % 2 === 0 ? 2 : 1.5);
+  tone(melody, 0.2, "triangle", musicMode === "boss" ? 0.105 : 0.085, melody * 1.04, musicGain);
   if (musicStep % 2 === 0) {
-    tone(root / 2, 0.52, "triangle", 0.055, root / 2.8, musicGain);
-  }
-  if (musicMode !== "menu" && musicStep % 4 === 2) {
-    tone(root * 2, 0.16, "sine", 0.035, root * 1.5, musicGain);
+    tone(root / 2, 0.34, "triangle", 0.075, root / 2.5, musicGain);
   }
   musicStep += 1;
 }
