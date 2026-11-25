@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { playSfx, setMusicMode, unlockAudio } from "./audio";
 
 export type GameStatus = "ready" | "running" | "paused" | "upgrade" | "gameover" | "victory";
 export type WeaponType = "laser" | "homing" | "spread" | "piercing";
@@ -330,6 +331,7 @@ export function useShooterGame() {
   const completeStage = useCallback(() => {
     const game = runtimeRef.current;
     if (statusRef.current !== "running" || game.boss === null) return;
+    playSfx("bossKill");
     const clearedStage = game.stage;
     // 每通过一关自动恢复 1 格生命，生命值不超过当前最大生命上限。
     game.lives = Math.min(game.maxLives, game.lives + 1);
@@ -373,6 +375,8 @@ export function useShooterGame() {
   }, [recordLeaderboard, updateBestScore, updateStatus]);
 
   const startGame = useCallback(() => {
+    unlockAudio();
+    setMusicMode("battle");
     runtimeRef.current = createRuntime();
     keysRef.current.clear();
     touchActiveRef.current = false;
@@ -405,6 +409,7 @@ export function useShooterGame() {
 
   const resumeGame = useCallback(() => {
     if (statusRef.current === "paused") {
+      unlockAudio();
       updateStatus("running");
     }
   }, [updateStatus]);
@@ -414,6 +419,7 @@ export function useShooterGame() {
   }, [startGame]);
 
   const chooseWeapon = useCallback((nextWeapon: WeaponType) => {
+    if (runtimeRef.current.weaponType !== nextWeapon) playSfx("weapon");
     runtimeRef.current.weaponType = nextWeapon;
     setWeaponType(nextWeapon);
   }, []);
@@ -433,6 +439,7 @@ export function useShooterGame() {
     const game = runtimeRef.current;
     if (statusRef.current !== "running" || game.bombCount <= 0) return;
     game.bombCount -= 1;
+    playSfx("bomb");
     game.enemyShots = [];
     game.bombFlash = 0.55;
     game.enemies.forEach((enemy) => {
@@ -584,6 +591,7 @@ export function useShooterGame() {
         hitFlash: 0, shieldBreakFlash: 0,
       };
       game.bossSpawned = true;
+      playSfx("bossIntro");
       setBossName(game.boss.name);
       setBossPhase(1);
       setBossMaxHealth(hp);
@@ -600,12 +608,14 @@ export function useShooterGame() {
       if (game.playerInvulnerable > 0 || statusRef.current !== "running") return;
       if (game.shieldCharges > 0) {
         game.shieldCharges -= 1;
+        playSfx("shield");
         game.playerInvulnerable = 1.35;
         setShieldCharges(game.shieldCharges);
         emitExplosion(game.playerX, game.playerY, "#75d9ff", 22);
         return;
       }
       game.lives = Math.max(0, game.lives - 1);
+      playSfx("hurt");
       game.playerInvulnerable = 1.35;
       emitExplosion(game.playerX, game.playerY, "#75f3ff", 18);
       setLives(game.lives);
@@ -621,6 +631,7 @@ export function useShooterGame() {
 
     const firePlayerShots = () => {
       const game = runtimeRef.current;
+      playSfx("fire", game.weaponType);
       const patterns = game.weaponType === "spread" || game.spreadBuffTime > 0
         ? [
             { offset: -28, vx: -34 },
@@ -829,6 +840,8 @@ export function useShooterGame() {
       const defeated = game.enemies.filter((enemy) => enemy.hp <= 0);
       defeated.forEach((enemy) => {
         game.combo += 1;
+        playSfx("explosion");
+        if (game.combo % 5 === 0) playSfx("combo");
         game.comboTimer = 2.4;
         const comboMultiplier = Math.min(3, 1 + Math.floor(game.combo / 5) * 0.25);
         game.score += Math.round((enemy.maxHp > 1 ? 180 : 100) * comboMultiplier);
@@ -886,6 +899,7 @@ export function useShooterGame() {
           )
         ) {
           drop.y = HEIGHT + 50;
+          playSfx("pickup");
           if (drop.kind === "spread") {
             game.spreadBuffTime = 10;
             setSpreadBuffTime(10);
