@@ -130,7 +130,7 @@ function noise(duration: number, volume = 0.22): void {
 
 function playMusicPhrase(): void {
   if (!settings.musicEnabled || !musicGain || !audioContext) return;
-  // Mid-range synth notes make the soundtrack audible on phone speakers.
+  // A warm, slow ambient-electronic theme: rounded tones instead of sharp synth attacks.
   const scale = musicMode === "boss"
     ? [110, 130.81, 146.83, 164.81, 146.83, 130.81, 98, 116.54]
     : musicMode === "battle"
@@ -139,28 +139,28 @@ function playMusicPhrase(): void {
   const root = scale[musicStep % scale.length];
   const now = audioContext.currentTime;
 
-  // Soft, filtered synth pad underneath the melody.
+  // Gentle sine-wave pad with a slow fade-in and a soft, lingering release.
   const pad = audioContext.createOscillator();
   const padGain = audioContext.createGain();
   const filter = audioContext.createBiquadFilter();
-  pad.type = "sawtooth";
+  pad.type = "sine";
   pad.frequency.setValueAtTime(root, now);
   filter.type = "lowpass";
-  filter.frequency.value = musicMode === "boss" ? 1250 : 980;
+  filter.frequency.value = musicMode === "boss" ? 850 : 700;
   padGain.gain.setValueAtTime(0.0001, now);
-  padGain.gain.linearRampToValueAtTime(musicMode === "boss" ? 0.17 : 0.13, now + 0.08);
-  padGain.gain.setTargetAtTime(0.0001, now + 0.34, 0.2);
+  padGain.gain.linearRampToValueAtTime(musicMode === "boss" ? 0.085 : 0.07, now + 0.28);
+  padGain.gain.setTargetAtTime(0.0001, now + 0.95, 0.42);
   pad.connect(filter);
   filter.connect(padGain);
   padGain.connect(musicGain);
   pad.start(now);
-  pad.stop(now + 0.82);
+  pad.stop(now + 2.35);
 
-  // A clear, restrained arpeggio gives the music a recognizable sci-fi theme.
+  // A quiet, rounded triangle note adds a simple melody without piercing the mix.
   const melody = root * (musicStep % 2 === 0 ? 2 : 1.5);
-  tone(melody, 0.2, "triangle", musicMode === "boss" ? 0.105 : 0.085, melody * 1.04, musicGain);
+  tone(melody, 0.42, "sine", musicMode === "boss" ? 0.045 : 0.038, melody * 1.015, musicGain);
   if (musicStep % 2 === 0) {
-    tone(root / 2, 0.34, "triangle", 0.075, root / 2.5, musicGain);
+    tone(root / 2, 0.72, "sine", 0.032, root / 2, musicGain);
   }
   musicStep += 1;
 }
