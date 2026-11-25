@@ -642,3 +642,12 @@ kbd {
   .audio-toggle { min-height: 30px; padding: 0 8px; font-size: 8px; }
   .audio-panel { top: calc(100% + 6px); }
 }
+
+
+.audio-preview {
+  width: 100%; margin-top: 9px; padding: 9px 10px;
+  border: 1px solid rgba(91, 212, 223, .42);
+  color: #bcecf0; background: rgba(38, 119, 139, .16);
+  cursor: pointer; font: 10px var(--app-font-mono); letter-spacing: .04em;
+}
+.audio-preview:hover { border-color: #65e5ef; color: #fff; background: rgba(38, 119, 139, .28); }
