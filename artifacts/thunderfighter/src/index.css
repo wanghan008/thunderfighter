@@ -611,3 +611,34 @@ kbd {
 
 .boss-phase-label { display: inline-block; margin-left: 7px; padding: 2px 5px; border: 1px solid rgba(255,190,112,.38); color: #ffd18a; font-style: normal; letter-spacing: .04em; }
 .boss-health { filter: drop-shadow(0 0 8px rgba(255,83,113,.2)); }
+
+
+/* Sci-fi audio controls */
+.topbar { position: relative; }
+.topbar-tools { display: flex; align-items: center; gap: 14px; }
+.audio-toggle {
+  display: inline-flex; min-height: 34px; padding: 0 11px; align-items: center; gap: 7px;
+  border: 1px solid rgba(104, 190, 204, .35); color: #a9c4ca;
+  background: rgba(12, 25, 38, .88); cursor: pointer;
+  font: 10px var(--app-font-mono); letter-spacing: .05em;
+}
+.audio-toggle:hover { border-color: #63d8e5; color: #e6fbff; }
+.audio-panel {
+  position: absolute; z-index: 12; top: calc(100% + 9px); right: 0; width: min(290px, calc(100vw - 34px));
+  padding: 14px; border: 1px solid rgba(104, 190, 204, .45);
+  background: rgba(7, 17, 29, .97); box-shadow: 0 16px 40px rgba(0,0,0,.48), 0 0 22px rgba(46, 177, 197, .1);
+}
+.audio-panel-heading { display: flex; align-items: center; justify-content: space-between; margin-bottom: 13px; color: #e8f5f4; font-size: 13px; }
+.audio-panel-heading button { border: 0; color: #8da6ad; background: transparent; cursor: pointer; font-size: 22px; line-height: 1; }
+.audio-switch { display: flex; align-items: center; gap: 8px; margin: 10px 0; color: #b5c8cc; font-size: 12px; }
+.audio-switch input { width: 15px; height: 15px; accent-color: #5bd4df; }
+.audio-range { display: block; margin: 7px 0 13px 23px; color: #829ba3; font: 9px var(--app-font-mono); }
+.audio-range span { display: flex; justify-content: space-between; margin-bottom: 6px; }
+.audio-range b { color: #f5c744; font-weight: 600; }
+.audio-range input { width: 100%; accent-color: #5bd4df; }
+.audio-panel > p { margin: 12px 0 0; color: #55727c; font: 8px var(--app-font-mono); letter-spacing: .08em; }
+@media (max-width: 650px) {
+  .topbar-tools { gap: 7px; }
+  .audio-toggle { min-height: 30px; padding: 0 8px; font-size: 8px; }
+  .audio-panel { top: calc(100% + 6px); }
+}
